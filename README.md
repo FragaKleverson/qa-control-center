@@ -1,11 +1,9 @@
-````md
 # Gerador de Documentação de Testes (.DOCX)
 
 Automatizador em **Node.js** para gerar documentos `.docx` padronizados a partir de cenários de teste escritos em **JSON**.
 
 Ideal para times de **QA**, **Analistas de Testes**, **POs** e squads que precisam criar documentação rápida, bonita e repetível sem sofrer no Word.
 
----
 
 ## 🚀 Objetivo
 
@@ -16,7 +14,6 @@ Transformar isso:
   "titulo": "CA1 — Integração com OAM",
   "cenarios": [...]
 }
-````
 
 Nisso:
 
@@ -26,7 +23,6 @@ Nisso:
 * Cenários em Gherkin
 * Arquivos separados por história/teste
 
----
 
 ## 📁 Estrutura do Projeto
 
@@ -54,7 +50,6 @@ gerador_de_doc_de_teste/
 │── README.md
 ```
 
----
 
 ## ⚙️ Tecnologias Utilizadas
 
@@ -63,7 +58,6 @@ gerador_de_doc_de_teste/
 * JavaScript
 * JSON
 
----
 
 ## 📦 Instalação
 
@@ -85,7 +79,6 @@ Instale dependências:
 npm install
 ```
 
----
 
 ## ▶️ Como Executar
 
@@ -93,7 +86,6 @@ npm install
 node generator.js
 ```
 
----
 
 ## 📄 Resultado
 
@@ -111,7 +103,6 @@ ca2_api_autenticacao_aura.docx
 ca3_middleware_bot.docx
 ```
 
----
 
 ## 🧠 Como Adicionar Novos Testes
 
@@ -148,7 +139,6 @@ Modelo:
 ]
 ```
 
----
 
 ## 🎨 Personalização Visual
 
@@ -167,7 +157,6 @@ Você pode alterar:
 * versão
 * descrição
 
----
 
 ## 🖼️ Logo da Empresa
 
@@ -186,7 +175,6 @@ Se quiser trocar:
 templates/header.js
 ```
 
----
 
 ## 💡 Casos de Uso
 
@@ -197,7 +185,6 @@ templates/header.js
 * Features em Gherkin
 * Histórico de testes por sprint
 
----
 
 ## 🔥 Próximas Evoluções
 
@@ -208,7 +195,6 @@ templates/header.js
 * Evidência automática pós execução
 * Pipeline CI/CD
 
----
 
 ## 🤝 Contribuição
 
@@ -216,14 +202,12 @@ Sugestões e melhorias são bem-vindas.
 
 Faça um fork, melhore e mande PR.
 
----
 
 ## 👨‍💻 Autor
 
 Desenvolvido por **Kleverson Fraga Costa**
-QA Analyst | Automação | Processos | Documentação Inteligente
+QA Analyst | Automação | Processos |
 
----
 
 ## 😏 Resumo sincero
 
