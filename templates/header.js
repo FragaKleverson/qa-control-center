@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 function buildHeader() {
-  const logoPath = path.join(__dirname, "../assets/vivo_logo.png");
+  const logoPath = path.resolve(__dirname, "../../assets/vivo_logo.png");
   const logo = fs.readFileSync(logoPath);
 
   return new Header({
@@ -12,7 +12,7 @@ function buildHeader() {
         children: [
           new ImageRun({
             data: logo,
-            transformation: { width: 140, height: 50 }
+            transformation: { width: 140 }
           })
         ],
         alignment: AlignmentType.CENTER,
@@ -23,7 +23,7 @@ function buildHeader() {
           bottom: {
             style: BorderStyle.SINGLE,
             size: 6,
-            color: "8433AD" 
+            color: "8433AD"
           }
         }
       })
