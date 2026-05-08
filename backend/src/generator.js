@@ -1,67 +1,128 @@
-const { Document, Packer, Paragraph, PageBreak } = require("docx");
+const { Document, Packer, Paragraph, TextRun } = require("docx");
 
-const { buildHeader } = require("../../templates/header");
-const { buildCover } = require("../../templates/cover");
-const { sectionTitle, infoBox, tag, codeBlock } = require("../../templates/docTemplate");
-
-function normalizeFileName(text) {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]/g, "_")
-    .replace(/_+/g, "_")
-    .toLowerCase();
+function safe(v) {
+  return typeof v === "string" ? v : String(v || "");
 }
 
-async function generateDoc(historia) {
+function title(text) {
+  return new Paragraph({
+    children: [
+      new TextRun({
+        text: safe(text),
+        bold: true,
+        size: 36
+      })
+    ]
+  });
+}
+
+function label(text) {
+  return new Paragraph({
+    children: [
+      new TextRun({
+        text,
+        bold: true
+      })
+    ]
+  });
+}
+
+function empty() {
+  return new Paragraph({ text: "" });
+}
+
+function separator() {
+  return new Paragraph({
+    children: [
+      new TextRun("────────────────────────────")
+    ]
+  });
+}
+
+function makeId(i) {
+  return `CT-${String(i + 1).padStart(3, "0")}`;
+}
+
+async function generateDoc(data) {
   const children = [];
 
-  // CAPA
-  children.push(...buildCover());
-  children.push(new Paragraph({ children: [new PageBreak()] }));
+  // 📌 TÍTULO
+  children.push(title(data.titulo));
+  children.push(empty());
 
-  // HISTÓRIA
-  children.push(sectionTitle(`📌 ${historia.titulo}`));
-  children.push(infoBox(historia.descricao));
+  // 📄 INFO
+  children.push(label("Descrição"));
+  children.push(new Paragraph({ text: safe(data.descricao) }));
+  children.push(empty());
 
-  // Feature
-  children.push(...codeBlock([`Feature: ${historia.feature}`]));
+  children.push(label("Feature"));
+  children.push(new Paragraph({ text: safe(data.feature) }));
+  children.push(empty());
 
-  // Background
-  if (historia.background) {
-    children.push(...codeBlock([
-      "",
-      "Background:",
-      ...historia.background
-    ]));
+  children.push(separator());
+  children.push(label("CASOS DE TESTE"));
+  children.push(empty());
+
+  if (Array.isArray(data.cenarios)) {
+    data.cenarios.forEach((c, i) => {
+      if (!c?.nome) return;
+
+      const id = makeId(i);
+
+      // HEADER DO CENÁRIO
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `${id} | ${c.nome} | ${c.tipo}`,
+              bold: true,
+              size: 24
+            })
+          ]
+        })
+      );
+
+      children.push(empty());
+
+      // PASSOS (AGORA CORRETO: 1 POR LINHA)
+      const passos = Array.isArray(c.passos)
+        ? c.passos
+        : typeof c.passos === "string"
+          ? c.passos.split("\n")
+          : [];
+
+      passos
+        .filter(Boolean)
+        .forEach(p => {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `• ${p.trim()}`
+                })
+              ]
+            })
+          );
+        });
+
+      children.push(empty());
+      children.push(separator());
+    });
   }
-
-  // Cenários
-  (historia.cenarios || []).forEach(c => {
-    children.push(tag(c.tipo, c.nome));
-
-    children.push(...codeBlock([
-      `Scenario: ${c.nome}`,
-      ...c.passos
-    ]));
-  });
 
   const doc = new Document({
-    sections: [{
-      headers: { default: buildHeader() },
-      children
-    }]
+    sections: [
+      {
+        children
+      }
+    ]
   });
 
-  try {
-    const buffer = await Packer.toBuffer(doc);
-    return { buffer, fileName };
-  } catch (err) {
-    throw new Error("Erro ao gerar DOCX");
-  }
+  const buffer = await Packer.toBuffer(doc);
+
   return {
     buffer,
-    fileName: historia.fileName || normalizeFileName(historia.titulo)
+    fileName: data.fileName || "qa-document"
   };
 }
 

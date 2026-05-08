@@ -1,5 +1,26 @@
+# node
 node_modules/
-Testes/
-*.docx
+npm-debug.log
+yarn-error.log
+
+# env
 .env
+.env.local
+.env.*.local
+
+# build
+dist/
+build/
+
+# vite
+.vite/
+
+# logs
+logs/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# backend output
+DEBUG_BACKEND.docx
