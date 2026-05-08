@@ -1,16 +1,13 @@
 {
-  "name": "gerador_de_doc_de_teste",
-  "version": "1.0.0",
-  "main": "testes.js",
+  "name": "qa-control-center",
+  "version": "2.0.0",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:backend": "node backend/src/app.js",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "docx": "^9.6.1",
-    "pg": "^8.20.0"
+  "devDependencies": {
+    "concurrently": "^9.0.0"
   }
 }

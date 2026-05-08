@@ -158,7 +158,7 @@ qa-control-center/
 ## Clone o projeto
 
 ```bash
-git clone https://github.com/FragaKleverson/gerador_de_doc_de_teste.git
+git clone https://github.com/FragaKleverson/qa-control-center.git
 ```
 
 
