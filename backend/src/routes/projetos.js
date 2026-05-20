@@ -13,6 +13,12 @@ router.post("/", async (req, res) => {
   try {
     const { titulo, descricao, feature, cenarios } = req.body;
 
+    if (!titulo || !descricao || !feature) {
+      return res.status(400).json({
+        error: "Campos obrigatórios: título, descrição e feature"
+      });
+    }
+
     await client.query("BEGIN");
 
     // 1. cria projeto

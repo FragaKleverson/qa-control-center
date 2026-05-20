@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import "./App.css";
 
+
 export default function App() {
+
+  const [loading, setLoading] = useState(false);
   const categorias = [
     "Happy Path",
     "Sad Path",
@@ -27,7 +30,23 @@ export default function App() {
   });
 
   /* 🔥 TOAST */
-  const [toast, setToast] = useState("");
+  const toastTimerRef = useRef(null);
+  const [toast, setToast] = useState({
+    message: "",
+    type: ""
+  });
+
+  function showToast(message, type = "info") {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ message, type });
+
+    toastTimerRef.current = setTimeout(() => {
+      setToast({ message: "", type: "" });
+    }, 3000);
+  }
 
   function updateField(field, value) {
     setDoc((prev) => ({ ...prev, [field]: value }));
@@ -59,22 +78,59 @@ export default function App() {
   }
 
   async function saveProject() {
-    const res = await fetch("http://localhost:3001/projetos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(doc)
+
+    const hasEmptyScenario = doc.cenarios.some((cenario) => {
+      return (
+        !cenario.nome.trim() ||
+        !cenario.tipo.trim() ||
+        !cenario.passos.trim()
+      );
     });
 
-    if (!res.ok) {
-      alert(await res.text());
+    if (
+      !doc.titulo.trim() ||
+      !doc.descricao.trim() ||
+      !doc.feature.trim() ||
+      hasEmptyScenario
+    ) {
+      showToast("Preencha todos os campos obrigatórios dos cenários", "warning");
       return;
     }
 
-    setToast("Projeto salvo com sucesso!");
+    try {
+      const res = await fetch("http://localhost:3001/projetos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(doc)
+      });
 
-    setTimeout(() => {
-      setToast("");
-    }, 3000);
+      if (!res.ok) {
+        showToast(await res.text(), "error");
+        return;
+      }
+
+      const data = await res.json();
+      console.log("✅ SALVO:", data);
+
+      showToast("Projeto salvo com sucesso!", "success");
+
+      setDoc({
+        titulo: "",
+        descricao: "",
+        feature: "",
+        cenarios: [
+          {
+            nome: "",
+            tipo: "Happy Path",
+            passos: ""
+          }
+        ]
+      });
+
+    } catch (error) {
+      console.error("❌ ERRO:", error);
+      showToast("Erro ao salvar projeto", "error");
+    }
   }
 
   return (
@@ -156,8 +212,8 @@ Then ..."
           + cenário
         </button>
 
-        <button className="success" onClick={saveProject}>
-          💾 Salvar no banco
+        <button className="success" onClick={saveProject} disabled={loading}>
+          {loading ? "Salvando..." : "💾 Salvar no banco"}
         </button>
 
         <div className="counterBox">
@@ -165,9 +221,9 @@ Then ..."
         </div>
 
       </div>
-      {toast && (
-        <div className="toast">
-          {toast}
+      {toast.message && (
+        <div className={`toast ${toast.type}`}>
+          {toast.message}
         </div>
       )}
     </div>
