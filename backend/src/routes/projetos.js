@@ -13,10 +13,37 @@ router.post("/", async (req, res) => {
   try {
     const { titulo, descricao, feature, cenarios } = req.body;
 
-    if (!titulo || !descricao || !feature) {
+    if (
+      !titulo || !titulo.trim() ||
+      !descricao || !descricao.trim() ||
+      !feature || !feature.trim()
+    ) {
       return res.status(400).json({
-        error: "Campos obrigatórios: título, descrição e feature"
+        error: "Campos obrigatórios inválidos"
       });
+    }
+
+    // cenários obrigatório ser array se existir
+    if (cenarios !== undefined && !Array.isArray(cenarios)) {
+      return res.status(400).json({
+        error: "cenarios deve ser um array"
+      });
+    }
+
+    // valida cenários
+    if (Array.isArray(cenarios)) {
+      for (const c of cenarios) {
+        if (
+          typeof c !== "object" ||
+          !c.nome ||
+          typeof c.nome !== "string" ||
+          !c.nome.trim()
+        ) {
+          return res.status(400).json({
+            error: "Cenário inválido"
+          });
+        }
+      }
     }
 
     await client.query("BEGIN");
@@ -62,6 +89,22 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
+  }
+});
+
+// ============================
+// LISTAR PROJETOS
+// ============================
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM projetos ORDER BY id DESC"
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ ERRO:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 

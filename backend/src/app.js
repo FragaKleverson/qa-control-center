@@ -8,25 +8,6 @@ const executionsRoutes = require("./routes/executions");
 
 const app = express();
 
-/* =========================
-   🔥 DEBUG GLOBAL
-========================= */
-console.log("🔥 APP.JS INICIOU EXECUÇÃO");
-
-console.log("RUNS:", runsRoutes);
-console.log("EXECUTIONS:", executionsRoutes);
-
-process.on("exit", (code) => {
-  console.log("💀 PROCESSO FINALIZOU COM CODE:", code);
-});
-
-process.on("uncaughtException", (err) => {
-  console.log("💥 EXCEPTION NÃO TRATADA:", err);
-});
-
-process.on("unhandledRejection", (err) => {
-  console.log("💥 PROMISE REJEITADA:", err);
-});
 
 /* =========================
    MIDDLEWARES
@@ -85,14 +66,4 @@ app.use("/projetos", projetosRoutes);
 app.use("/runs", runsRoutes);
 app.use("/executions", executionsRoutes);
 
-const server = app.listen(3001, () => {
-  console.log("🚀 SERVER ESCUTANDO NA PORTA 3001");
-});
-
-server.on("listening", () => {
-  console.log("🟢 EVENTO LISTENING DISPARADO");
-});
-
-server.on("error", (err) => {
-  console.log("💥 ERRO NO SERVER:", err);
-});
+module.exports = app;

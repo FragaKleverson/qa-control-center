@@ -76,9 +76,8 @@ async function init() {
 
   } catch (err) {
     console.error("❌ Erro ao criar tabelas:", err.message);
-  } finally {
-    await pool.end();
+    throw err;
   }
 }
 
-init();
+module.exports = { init };

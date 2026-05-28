@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: qa-db
+    restart: always
+    environment:
+      POSTGRES_USER: qauser
+      POSTGRES_PASSWORD: qapass
+      POSTGRES_DB: qadb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: qa-backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: qauser
+      DB_PASSWORD: qapass
+      DB_DATABASE: qadb
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build: ./frontend
+    container_name: qa-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+
+volumes:
+  pgdata:

@@ -1,9 +1,18 @@
 const app = require("./app");
+const { init } = require("./init-db");
 
-const server = app.listen(3001, () => {
-    console.log("🚀 SERVER ESCUTANDO NA PORTA 3001");
-});
+async function start() {
+  try {
+    await init();
 
-server.on("error", (err) => {
-    console.log("💥 ERRO NO SERVER:", err);
-});
+    app.listen(3001, "0.0.0.0", () => {
+      console.log("🚀 SERVER NA PORTA 3001");
+    });
+
+  } catch (err) {
+    console.error("💥 FALHA AO INICIAR:", err);
+    process.exit(1);
+  }
+}
+
+start();
