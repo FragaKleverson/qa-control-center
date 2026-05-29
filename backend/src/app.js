@@ -5,6 +5,12 @@ const { generateDoc } = require("./generator");
 const projetosRoutes = require("./routes/projetos");
 const runsRoutes = require("./routes/runs");
 const executionsRoutes = require("./routes/executions");
+const testSuitesRoutes = require("./routes/testSuites");
+const requirementsRoutes = require("./routes/requirements");
+const testPlansRoutes = require("./routes/testPlans");
+const statsRoutes = require("./routes/stats");
+const execucoesDetalhado = require("./routes/execucoesDetalhado");
+const relatorios = require("./routes/relatorios");
 
 const app = express();
 
@@ -65,5 +71,11 @@ app.post("/api/generate-doc", async (req, res) => {
 app.use("/projetos", projetosRoutes);
 app.use("/runs", runsRoutes);
 app.use("/executions", executionsRoutes);
+app.use("/test-suites", testSuitesRoutes);
+app.use("/requirements", requirementsRoutes);
+app.use("/test-plans", testPlansRoutes);
+app.use("/stats", statsRoutes);
+app.use("/execucoes", execucoesDetalhado);
+app.use("/relatorios", relatorios);
 
 module.exports = app;

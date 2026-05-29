@@ -1,0 +1,74 @@
+const express = require("express");
+const router = express.Router();
+const { executionsService } = require("../services");
+
+console.log("🔥 execucoes.js carregado");
+
+// GET - Listar todas as execuções
+router.get("/", async (req, res) => {
+  try {
+    const executions = await executionsService.listAll();
+    res.json(executions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Obter execução por ID
+router.get("/:id", async (req, res) => {
+  try {
+    const execution = await executionsService.getById(req.params.id);
+    if (!execution) return res.status(404).json({ error: "Execução não encontrada" });
+    res.json(execution);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST - Criar nova execução
+router.post("/", async (req, res) => {
+  try {
+    const execution = await executionsService.create(req.body);
+    res.status(201).json(execution);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT - Atualizar execução
+router.put("/:id", async (req, res) => {
+  try {
+    const execution = await executionsService.update(req.params.id, req.body);
+    res.json(execution);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE - Deletar execução
+router.delete("/:id", async (req, res) => {
+  try {
+    await executionsService.delete(req.params.id);
+    res.json({ message: "Execução deletada com sucesso" });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET - Obter estatísticas de execuções
+router.get("/stats/summary", async (req, res) => {
+  try {
+    const stats = await executionsService.getStats();
+    res.json(stats);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
