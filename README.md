@@ -1,280 +1,150 @@
 # QA Control Center
 
-Plataforma de gerenciamento, documentação e execução de testes para times de QA.
+Plataforma completa de gerenciamento e execução de testes para times de QA.
 
-O QA Control Center permite criar projetos de teste, organizar cenários em Gherkin, salvar tudo em banco de dados, exportar documentação `.docx` e futuramente executar testes com rastreabilidade completa.
+Inspirada em ferramentas como TestRail, Xray e QMetry — mas sem a burocracia e sem o preço.
 
+---
 
-# Visão Geral
+## Funcionalidades
 
-O projeto nasceu como um gerador de documentação `.docx` para QA.
+- **Test Cases** — Criação, edição e listagem com ID padronizado (`TC0001`), cenários Gherkin e categorização por tipo
+- **Test Suites** — Agrupamento de test cases em suites reutilizáveis
+- **Test Plans** — Planos de teste com escopo, objetivo, ambiente e vinculação de suites
+- **Executions** — Execução de plans com rastreabilidade por test case (Pending / Running / Passed / Failed / Blocked / Skipped)
+- **Requirements** — Cadastro de requisitos com prioridade e vinculação
+- **Reports** — Exportação de documentação em `.docx`
+- **Dashboard** — Visão geral com métricas, projetos recentes e últimas execuções
 
-Hoje evoluiu para uma plataforma completa de:
+---
 
-- gerenciamento de cenários
-- documentação de testes
-- persistência em PostgreSQL
-- execução de testes
-- rastreabilidade
-- geração de relatórios
-- exportação de evidências
+## Stack
 
-Inspirado em ferramentas como:
+| Camada | Tecnologia |
+|---|---|
+| Frontend | React 19 + Vite + React Router |
+| Backend | Node.js + Express 5 |
+| Banco | PostgreSQL 15 |
+| Infra | Docker + Docker Compose |
+| Docs | docx |
 
-- Xray
-- QMetry
-- TestRail
-- Jira Test Management
+---
 
+## Estrutura do Projeto
 
-# Principais Funcionalidades
-
-## Gestão de Projetos
-
-- criação de projetos de teste
-- descrição funcional
-- organização por feature
-
-
-## Gestão de Cenários
-
-- criação dinâmica de cenários
-- categorização:
-  - Happy Path
-  - Sad Path
-  - Regression
-  - Validation
-  - Smoke Test
-  - Security
-  - etc
-
-
-## Escrita Gherkin
-
-Suporte para:
-
-```gherkin
-Given ...
-When ...
-Then ...
 ```
-
-
-## Persistência em Banco
-
-Todos os projetos e cenários são armazenados em PostgreSQL.
-
-
-## Exportações
-
-- DOCX
-- JSON
-
-
-## Execução de Testes (em evolução)
-
-Status disponíveis:
-
-- PASSED
-- FAILED
-- BLOCKED
-- N/A
-
-Com suporte planejado para:
-
-- evidências
-- comentários
-- relatórios
-- histórico de execução
-
-
-# Arquitetura
-
-## Frontend
-
-- React
-- Vite
-- CSS customizado
-
-
-## Backend
-
-- Node.js
-- Express
-
-
-## Banco de Dados
-
-- PostgreSQL
-
-
-# Estrutura do Projeto
-
-```bash
 qa-control-center/
-│
 ├── backend/
 │   ├── src/
-│   │   ├── routes/
-│   │   ├── db.js
-│   │   ├── init-db.js
-│   │   └── app.js
-│
-├── dashboard/
+│   │   ├── routes/          # executions, projetos, testSuites, testPlans, ...
+│   │   ├── services/        # lógica de negócio e queries
+│   │   ├── db.js            # pool PostgreSQL
+│   │   └── server.js
+│   └── Dockerfile
+├── frontend/
 │   ├── src/
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   └── main.jsx
-│
-├── Testes/
-│
+│   │   ├── pages/           # Dashboard, TestCases, TestSuites, TestPlan, Executions, ...
+│   │   ├── components/      # Modal, ConfirmDialog, GherkinDisplay, Sidebar, ...
+│   │   ├── services/api.js  # cliente HTTP centralizado
+│   │   └── routes/
+│   └── Dockerfile
+├── db/
+│   └── init.sql/            # migrations iniciais (ordem garantida)
+├── .env.example             # template de variáveis de ambiente
+├── docker-compose.yml
 └── README.md
 ```
 
+---
 
-# Tecnologias Utilizadas
+## Configuração
 
-## Frontend
-
-- React
-- Vite
-
-## Backend
-
-- Node.js
-- Express
-
-## Database
-
-- PostgreSQL
-
-## Documentação
-
-- docx
-
-
-# Instalação
-
-## Clone o projeto
+### 1. Clone o repositório
 
 ```bash
 git clone https://github.com/FragaKleverson/qa-control-center.git
+cd qa-control-center
 ```
 
+### 2. Configure as variáveis de ambiente
 
-# Backend
+```bash
+cp .env.example .env
+```
 
-Entre na pasta:
+Edite o `.env` com suas credenciais:
+
+```env
+POSTGRES_USER=qauser
+POSTGRES_PASSWORD=sua_senha_aqui
+POSTGRES_DB=qadb
+
+DB_HOST=db
+DB_PORT=5432
+DB_USER=qauser
+DB_PASSWORD=sua_senha_aqui
+DB_DATABASE=qadb
+
+BACKEND_PORT=3001
+FRONTEND_PORT=5173
+DB_PORT_EXPOSED=5432
+```
+
+### 3. Suba os containers
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Acesse
+
+| Serviço | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:3001 |
+
+---
+
+## Fluxo de Uso
+
+```
+Test Cases  →  Test Suites  →  Test Plans  →  Execute  →  Executions
+                                                              ↓
+                                              Marcar cada TC: Passed / Failed / ...
+```
+
+1. Crie **Test Cases** com título, descrição, feature e passos Gherkin
+2. Agrupe em **Test Suites**
+3. Monte um **Test Plan** com suites, escopo e ambiente
+4. Clique em **Execute** para gerar uma execução
+5. Em **Executions**, expanda e atualize o status de cada test case individualmente
+
+---
+
+## Desenvolvimento local (sem Docker)
+
+### Backend
 
 ```bash
 cd backend
-```
-
-Instale dependências:
-
-```bash
 npm install
+# crie um .env na raiz com DB_HOST=localhost
+node src/server.js
 ```
 
-Execute:
+### Frontend
 
 ```bash
-node src/app.js
-```
-
-Servidor:
-
-```bash
-http://localhost:3001
-```
-
-
-# Frontend
-
-Entre na pasta:
-
-```bash
-cd dashboard
-```
-
-Instale dependências:
-
-```bash
+cd frontend
 npm install
-```
-
-Execute:
-
-```bash
 npm run dev
 ```
 
-Frontend:
+---
+
+## Testes
 
 ```bash
-http://localhost:5173
+cd backend
+npm test
 ```
-
-
-# Banco de Dados
-
-Necessário:
-
-- PostgreSQL
-
-Execute:
-
-```bash
-node src/init-db.js
-```
-
-Tabelas criadas:
-
-- projetos
-- cenarios
-- test_runs
-- test_executions
-
-
-# Roadmap
-
-## Próximas evoluções
-
-- autenticação de usuários
-- upload de evidências
-- screenshots automáticas
-- dashboard analítico
-- gráficos QA
-- integração Cypress
-- integração Playwright
-- relatórios PDF
-- execução automatizada
-- CI/CD
-- histórico de execução
-- permissões por perfil
-
-
-# Objetivo do Projeto
-
-Centralizar todo o fluxo de QA em uma única plataforma:
-
-- documentação
-- gerenciamento
-- execução
-- rastreabilidade
-- evidências
-- relatórios
-
-
-# Autor
-
-Kleverson Fraga Costa
-
-QA Analyst | Test Automation | Quality Engineering
-
-
-# Resumo sincero
-
-Se você ainda controla testes em Excel, Word e print no Teams...
-
-talvez esteja na hora de evoluir.
