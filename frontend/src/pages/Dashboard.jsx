@@ -91,14 +91,18 @@ export default function Dashboard() {
         <div>
           <h3 style={{ margin: "0 0 16px 0", color: "#111827" }}>🧪 {selectedItem.titulo}</h3>
           <div style={{ marginBottom: "16px" }}>
-            <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>
-              <strong>Descrição:</strong>
-            </p>
+            <p style={{ margin: "0 0 4px 0", color: "#6b7280", fontSize: "12px", fontWeight: "600", textTransform: "uppercase" }}>Descrição</p>
             <p style={{ margin: "0", color: "#111827" }}>{selectedItem.descricao}</p>
           </div>
+          <div style={{ marginBottom: "20px" }}>
+            <p style={{ margin: "0 0 4px 0", color: "#6b7280", fontSize: "12px", fontWeight: "600", textTransform: "uppercase" }}>Feature</p>
+            <code style={{ display: "block", background: "#f3f4f6", padding: "8px 12px", borderRadius: "6px", fontSize: "13px", color: "#374151" }}>
+              {selectedItem.feature}
+            </code>
+          </div>
           <div>
-            <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>
-              <strong>Cenários:</strong>
+            <p style={{ margin: "0 0 12px 0", color: "#6b7280", fontSize: "12px", fontWeight: "600", textTransform: "uppercase" }}>
+              Cenários ({selectedItem.cenarios && Array.isArray(selectedItem.cenarios) ? selectedItem.cenarios.length : 0})
             </p>
             {selectedItem.cenarios && Array.isArray(selectedItem.cenarios) && selectedItem.cenarios.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -156,7 +160,8 @@ export default function Dashboard() {
       <div className="stats-grid">
         <div 
           className="stat-card projects"
-          onClick={() => openModal("projects", projects[0])}
+          onClick={() => projects.length > 0 && openModal("projects", projects[0])}
+          style={{ cursor: projects.length > 0 ? "pointer" : "default" }}
         >
           <div className="stat-card-content">
             <div className="stat-card-label">📁 Total Projects</div>
@@ -169,7 +174,7 @@ export default function Dashboard() {
 
         <div 
           className="stat-card test-cases"
-          onClick={() => openModal("testCases", testCases[0])}
+          style={{ cursor: "default" }}
         >
           <div className="stat-card-content">
             <div className="stat-card-label">🧪 Total Test Cases</div>
@@ -182,7 +187,8 @@ export default function Dashboard() {
 
         <div 
           className="stat-card executions"
-          onClick={() => openModal("executions", executions[0])}
+          onClick={() => executions.length > 0 && openModal("executions", executions[0])}
+          style={{ cursor: executions.length > 0 ? "pointer" : "default" }}
         >
           <div className="stat-card-content">
             <div className="stat-card-label">🚀 Total Executions</div>
@@ -219,6 +225,32 @@ export default function Dashboard() {
         </div>
 
         <div className="dashboard-section">
+          <h2>🧪 Recent Test Cases</h2>
+          {testCases.length > 0 ? (
+            <div className="section-list">
+              {testCases.slice(0, 5).map((tc) => (
+                <div
+                  key={tc.id}
+                  className="list-item"
+                  onClick={() => openModal("testCases", tc)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <p className="list-item-title">{tc.titulo}</p>
+                  <p className="list-item-meta">
+                    {tc.cenarios && Array.isArray(tc.cenarios)
+                      ? `${tc.cenarios.length} cenário${tc.cenarios.length !== 1 ? "s" : ""}`
+                      : "0 cenários"}{" "}
+                    · {new Date(tc.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: "#9ca3af", fontSize: "14px" }}>No test cases yet. Create one to get started!</p>
+          )}
+        </div>
+
+        <div className="dashboard-section">
           <h2>🚀 Recent Executions</h2>
           {executions.length > 0 ? (
             <div className="section-list">
@@ -228,7 +260,7 @@ export default function Dashboard() {
                   className="list-item"
                   onClick={() => openModal("executions", execution)}
                 >
-                  <p className="list-item-title">{execution.nome_suite}</p>
+                  <p className="list-item-title">{execution.nome_suite || `Suite #${execution.suite_id}`}</p>
                   <p className="list-item-meta">
                     {new Date(execution.created_at).toLocaleDateString()}
                   </p>

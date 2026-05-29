@@ -81,6 +81,36 @@ const testSuitesService = {
     const result = await query("DELETE FROM test_suites WHERE id = $1 RETURNING *", [id]);
     if (result.rows.length === 0) throw new Error("Suite não encontrada");
     return result.rows[0];
+  },
+
+  // Retorna os test cases (projetos) vinculados a uma suite
+  getCases: async (suiteId) => {
+    const result = await query(
+      `SELECT p.* FROM projetos p
+       INNER JOIN test_suite_cases tsc ON tsc.projeto_id = p.id
+       WHERE tsc.suite_id = $1
+       ORDER BY tsc.created_at ASC`,
+      [suiteId]
+    );
+    return result.rows;
+  },
+
+  // Vincula um test case a uma suite
+  addCase: async (suiteId, projetoId) => {
+    const result = await query(
+      "INSERT INTO test_suite_cases (suite_id, projeto_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING *",
+      [suiteId, projetoId]
+    );
+    return result.rows[0] || { suite_id: suiteId, projeto_id: projetoId };
+  },
+
+  // Remove vínculo de test case de uma suite
+  removeCase: async (suiteId, projetoId) => {
+    await query(
+      "DELETE FROM test_suite_cases WHERE suite_id = $1 AND projeto_id = $2",
+      [suiteId, projetoId]
+    );
+    return { removed: true };
   }
 };
 
@@ -159,13 +189,93 @@ const testPlansService = {
     const result = await query("DELETE FROM test_plans WHERE id = $1 RETURNING *", [id]);
     if (result.rows.length === 0) throw new Error("Test Plan não encontrado");
     return result.rows[0];
+  },
+
+  // Retorna as suites vinculadas a um plan (com contagem de test cases)
+  getSuites: async (planId) => {
+    const result = await query(
+      `SELECT ts.*,
+        (SELECT COUNT(*) FROM test_suite_cases tsc WHERE tsc.suite_id = ts.id) AS total_cases
+       FROM test_suites ts
+       INNER JOIN test_plan_suites tps ON tps.suite_id = ts.id
+       WHERE tps.plan_id = $1
+       ORDER BY tps.created_at ASC`,
+      [planId]
+    );
+    return result.rows;
+  },
+
+  // Vincula uma suite a um plan
+  addSuite: async (planId, suiteId) => {
+    const result = await query(
+      "INSERT INTO test_plan_suites (plan_id, suite_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING *",
+      [planId, suiteId]
+    );
+    return result.rows[0] || { plan_id: planId, suite_id: suiteId };
+  },
+
+  // Remove vínculo de suite de um plan
+  removeSuite: async (planId, suiteId) => {
+    await query(
+      "DELETE FROM test_plan_suites WHERE plan_id = $1 AND suite_id = $2",
+      [planId, suiteId]
+    );
+    return { removed: true };
+  },
+
+  // Cria execução a partir de um plan (popula execution_results com todos os test cases)
+  execute: async (planId, ambiente = "staging") => {
+    const plan = await query("SELECT * FROM test_plans WHERE id = $1", [planId]);
+    if (plan.rows.length === 0) throw new Error("Test Plan não encontrado");
+
+    // Buscar a primeira suite do plan para usar como suite_id na execução
+    const suitesResult = await query(
+      "SELECT suite_id FROM test_plan_suites WHERE plan_id = $1 ORDER BY created_at ASC LIMIT 1",
+      [planId]
+    );
+    const suiteId = suitesResult.rows[0]?.suite_id || null;
+
+    // Criar execução
+    const execResult = await query(
+      "INSERT INTO execucoes (suite_id, ambiente, status) VALUES ($1, $2, 'pending') RETURNING *",
+      [suiteId, ambiente]
+    );
+    const execucao = execResult.rows[0];
+
+    // Buscar todos os test cases de todas as suites do plan
+    const casesResult = await query(
+      `SELECT DISTINCT tsc.projeto_id
+       FROM test_suite_cases tsc
+       INNER JOIN test_plan_suites tps ON tps.suite_id = tsc.suite_id
+       WHERE tps.plan_id = $1`,
+      [planId]
+    );
+
+    // Criar execution_results para cada test case
+    for (const row of casesResult.rows) {
+      await query(
+        "INSERT INTO execution_results (execucao_id, projeto_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING",
+        [execucao.id, row.projeto_id]
+      );
+    }
+
+    return execucao;
   }
 };
 
 // ==================== EXECUTIONS SERVICE ====================
 const executionsService = {
   listAll: async () => {
-    const result = await query("SELECT * FROM execucoes ORDER BY created_at DESC");
+    const result = await query(
+      `SELECT e.*,
+        ts.nome AS nome_suite,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id) AS total_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'passed') AS passed_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'failed') AS failed_cases
+       FROM execucoes e
+       LEFT JOIN test_suites ts ON ts.id = e.suite_id
+       ORDER BY e.created_at DESC`
+    );
     return result.rows;
   },
 
@@ -197,6 +307,47 @@ const executionsService = {
   delete: async (id) => {
     const result = await query("DELETE FROM execucoes WHERE id = $1 RETURNING *", [id]);
     if (result.rows.length === 0) throw new Error("Execução não encontrada");
+    return result.rows[0];
+  },
+
+  // Retorna todos os resultados de test cases de uma execução
+  getResults: async (execucaoId) => {
+    const result = await query(
+      `SELECT er.*, p.titulo, p.descricao, p.feature, p.cenarios
+       FROM execution_results er
+       INNER JOIN projetos p ON p.id = er.projeto_id
+       WHERE er.execucao_id = $1
+       ORDER BY er.created_at ASC`,
+      [execucaoId]
+    );
+    return result.rows;
+  },
+
+  // Atualiza status de um test case específico dentro de uma execução
+  updateResult: async (execucaoId, projetoId, status, comentario) => {
+    const result = await query(
+      `UPDATE execution_results
+       SET status = $1, comentario = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE execucao_id = $3 AND projeto_id = $4
+       RETURNING *`,
+      [status, comentario || null, execucaoId, projetoId]
+    );
+    if (result.rows.length === 0) throw new Error("Resultado não encontrado");
+
+    // Atualizar status geral da execução com base nos resultados
+    await query(
+      `UPDATE execucoes
+       SET status = CASE
+         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status = 'pending') > 0 THEN 'running'
+         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status = 'failed') > 0 THEN 'failed'
+         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status != 'passed') = 0 THEN 'passed'
+         ELSE 'running'
+       END,
+       updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [execucaoId]
+    );
+
     return result.rows[0];
   },
 

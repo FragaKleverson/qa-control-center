@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { requirementsAPI } from "../services/api";
 import "./Pages.css";
 
@@ -15,6 +16,7 @@ export default function Requirements() {
   });
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
+  const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
   useEffect(() => {
     loadRequirements();
@@ -71,17 +73,23 @@ export default function Requirements() {
     }
   }
 
-  async function handleDeleteRequirement(id) {
-    if (!confirm("Deseja deletar este requirement?")) return;
-
-    try {
-      await requirementsAPI.delete(id);
-      showToast("Requirement deletado", "success");
-      loadRequirements();
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao deletar requirement", "error");
-    }
+  function handleDeleteRequirement(id) {
+    setConfirmState({
+      isOpen: true,
+      message: "Deseja deletar este requirement?",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmState((s) => ({ ...s, isOpen: false }));
+        try {
+          await requirementsAPI.delete(id);
+          showToast("Requirement deletado", "success");
+          loadRequirements();
+        } catch (err) {
+          console.error(err);
+          showToast("Erro ao deletar requirement", "error");
+        }
+      },
+    });
   }
 
   const getPriorityColor = (prioridade) => {
@@ -218,6 +226,13 @@ export default function Requirements() {
         </form>
       </Modal>
 
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState((s) => ({ ...s, isOpen: false }))}
+      />
       {toast.message && (
         <div className={`toast ${toast.type}`}>
           {toast.message}

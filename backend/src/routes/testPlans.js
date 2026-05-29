@@ -60,4 +60,51 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// GET - Listar suites de um plan
+router.get("/:id/suites", async (req, res) => {
+  try {
+    const suites = await testPlansService.getSuites(req.params.id);
+    res.json(suites);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST - Vincular suite a um plan
+router.post("/:id/suites", async (req, res) => {
+  try {
+    const { suite_id } = req.body;
+    if (!suite_id) return res.status(400).json({ error: "suite_id é obrigatório" });
+    const result = await testPlansService.addSuite(req.params.id, suite_id);
+    res.status(201).json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE - Desvincular suite de um plan
+router.delete("/:id/suites/:suiteId", async (req, res) => {
+  try {
+    await testPlansService.removeSuite(req.params.id, req.params.suiteId);
+    res.json({ message: "Suite removida do plan" });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST - Executar plan (cria execução com todos os test cases das suites)
+router.post("/:id/execute", async (req, res) => {
+  try {
+    const { ambiente = "staging" } = req.body;
+    const execucao = await testPlansService.execute(req.params.id, ambiente);
+    res.status(201).json(execucao);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

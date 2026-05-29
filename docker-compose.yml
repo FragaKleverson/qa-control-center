@@ -1,16 +1,14 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:15
     container_name: qa-db
     restart: always
     environment:
-      POSTGRES_USER: qauser
-      POSTGRES_PASSWORD: qapass
-      POSTGRES_DB: qadb
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${DB_PORT_EXPOSED:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d
@@ -22,13 +20,13 @@ services:
     depends_on:
       - db
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: qauser
-      DB_PASSWORD: qapass
-      DB_DATABASE: qadb
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
     ports:
-      - "3001:3001"
+      - "${BACKEND_PORT:-3001}:3001"
 
   frontend:
     build: ./frontend
@@ -37,7 +35,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
 
 volumes:
   pgdata:

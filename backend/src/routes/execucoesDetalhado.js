@@ -71,4 +71,33 @@ router.get("/stats/summary", async (req, res) => {
   }
 });
 
+// GET - Listar resultados de test cases de uma execução
+router.get("/:id/results", async (req, res) => {
+  try {
+    const results = await executionsService.getResults(req.params.id);
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT - Atualizar status de um test case em uma execução
+router.put("/:id/results/:projetoId", async (req, res) => {
+  try {
+    const { status, comentario } = req.body;
+    if (!status) return res.status(400).json({ error: "status é obrigatório" });
+    const result = await executionsService.updateResult(
+      req.params.id,
+      req.params.projetoId,
+      status,
+      comentario
+    );
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

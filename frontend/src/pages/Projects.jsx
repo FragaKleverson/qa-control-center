@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { projectsAPI } from "../services/api";
 import "./Pages.css";
 
@@ -14,6 +15,7 @@ export default function Projects() {
   });
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
+  const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
   useEffect(() => {
     loadProjects();
@@ -73,17 +75,23 @@ export default function Projects() {
     }
   }
 
-  async function handleDeleteProject(id) {
-    if (!confirm("Deseja deletar este projeto?")) return;
-
-    try {
-      await projectsAPI.delete(id);
-      showToast("Projeto deletado", "success");
-      loadProjects();
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao deletar projeto", "error");
-    }
+  function handleDeleteProject(id) {
+    setConfirmState({
+      isOpen: true,
+      message: "Deseja deletar este projeto?",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmState((s) => ({ ...s, isOpen: false }));
+        try {
+          await projectsAPI.delete(id);
+          showToast("Projeto deletado", "success");
+          loadProjects();
+        } catch (err) {
+          console.error(err);
+          showToast("Erro ao deletar projeto", "error");
+        }
+      },
+    });
   }
 
   return (
@@ -191,6 +199,13 @@ export default function Projects() {
         </form>
       </Modal>
 
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        message={confirmState.message}
+        danger={confirmState.danger}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState((s) => ({ ...s, isOpen: false }))}
+      />
       {toast.message && (
         <div className={`toast ${toast.type}`}>
           {toast.message}

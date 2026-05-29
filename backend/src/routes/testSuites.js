@@ -60,4 +60,39 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// GET - Listar test cases de uma suite
+router.get("/:id/cases", async (req, res) => {
+  try {
+    const cases = await testSuitesService.getCases(req.params.id);
+    res.json(cases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST - Vincular test case a uma suite
+router.post("/:id/cases", async (req, res) => {
+  try {
+    const { projeto_id } = req.body;
+    if (!projeto_id) return res.status(400).json({ error: "projeto_id é obrigatório" });
+    const result = await testSuitesService.addCase(req.params.id, projeto_id);
+    res.status(201).json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE - Desvincular test case de uma suite
+router.delete("/:id/cases/:projetoId", async (req, res) => {
+  try {
+    await testSuitesService.removeCase(req.params.id, req.params.projetoId);
+    res.json({ message: "Test case removido da suite" });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

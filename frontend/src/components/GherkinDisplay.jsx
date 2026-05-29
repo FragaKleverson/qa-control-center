@@ -7,19 +7,33 @@ export default function GherkinDisplay({ testCase }) {
     
     lines.forEach(line => {
       const trimmed = line.trim();
-      if (trimmed.toLowerCase().startsWith('given ')) {
-        steps.push({ type: 'given', content: trimmed.substring(6).trim() });
-      } else if (trimmed.toLowerCase().startsWith('when ')) {
-        steps.push({ type: 'when', content: trimmed.substring(5).trim() });
-      } else if (trimmed.toLowerCase().startsWith('then ')) {
-        steps.push({ type: 'then', content: trimmed.substring(5).trim() });
-      } else if (trimmed.toLowerCase().startsWith('and ')) {
+      const lower = trimmed.toLowerCase();
+
+      if (lower.startsWith('given ') || lower.startsWith('dado que ') || lower.startsWith('dado ')) {
+        const prefix = lower.startsWith('dado que ') ? 9 : lower.startsWith('dado ') ? 5 : 6;
+        steps.push({ type: 'given', keyword: trimmed.substring(0, prefix).trim(), content: trimmed.substring(prefix).trim() });
+      } else if (lower.startsWith('when ') || lower.startsWith('quando ')) {
+        const prefix = lower.startsWith('quando ') ? 7 : 5;
+        steps.push({ type: 'when', keyword: trimmed.substring(0, prefix).trim(), content: trimmed.substring(prefix).trim() });
+      } else if (lower.startsWith('then ') || lower.startsWith('então ') || lower.startsWith('entao ')) {
+        const prefix = lower.startsWith('então ') || lower.startsWith('entao ') ? 6 : 5;
+        steps.push({ type: 'then', keyword: trimmed.substring(0, prefix).trim(), content: trimmed.substring(prefix).trim() });
+      } else if (lower.startsWith('and ') || lower.startsWith('e ')) {
         if (steps.length > 0) {
+          const prefix = lower.startsWith('and ') ? 4 : 2;
           steps.push({ 
             type: steps[steps.length - 1].type, 
-            content: trimmed.substring(4).trim(),
+            keyword: trimmed.substring(0, prefix).trim(),
+            content: trimmed.substring(prefix).trim(),
             isAnd: true 
           });
+        }
+      } else {
+        // linha sem keyword reconhecida — adiciona como continuação do último step ou step genérico
+        if (steps.length > 0) {
+          steps[steps.length - 1].content += ' ' + trimmed;
+        } else {
+          steps.push({ type: 'generic', keyword: '', content: trimmed });
         }
       }
     });
@@ -50,16 +64,19 @@ export default function GherkinDisplay({ testCase }) {
       )}
 
       {steps.length > 0 ? (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {steps.map((step, idx) => (
             <div 
               key={idx} 
               className={`gherkin-step gherkin-${step.type}`}
-              style={{
-                marginLeft: step.isAnd ? '20px' : '0'
-              }}
+              style={{ marginLeft: step.isAnd ? '20px' : '0' }}
             >
               <div className="gherkin-content">
+                {step.keyword && (
+                  <span style={{ fontWeight: '700', marginRight: '6px' }}>
+                    {step.keyword}
+                  </span>
+                )}
                 {step.content}
               </div>
             </div>
@@ -67,7 +84,7 @@ export default function GherkinDisplay({ testCase }) {
         </div>
       ) : testCase?.passos ? (
         <div className="gherkin-step" style={{ borderLeftColor: '#9ca3af' }}>
-          <div className="gherkin-content">
+          <div className="gherkin-content" style={{ whiteSpace: 'pre-wrap' }}>
             {testCase.passos}
           </div>
         </div>

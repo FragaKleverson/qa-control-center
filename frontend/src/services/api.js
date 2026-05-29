@@ -41,6 +41,18 @@ export const testSuitesAPI = {
     fetch(`${API_BASE_URL}/test-suites/${id}`, { method: "DELETE" }).then(r =>
       r.json()
     ),
+  getCases: (suiteId) =>
+    fetch(`${API_BASE_URL}/test-suites/${suiteId}/cases`).then(r => r.json()),
+  addCase: (suiteId, projetoId) =>
+    fetch(`${API_BASE_URL}/test-suites/${suiteId}/cases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projeto_id: projetoId }),
+    }).then(r => r.json()),
+  removeCase: (suiteId, projetoId) =>
+    fetch(`${API_BASE_URL}/test-suites/${suiteId}/cases/${projetoId}`, {
+      method: "DELETE",
+    }).then(r => r.json()),
 };
 
 // ==================== REQUIREMENTS ====================
@@ -83,6 +95,24 @@ export const testPlansAPI = {
     fetch(`${API_BASE_URL}/test-plans/${id}`, { method: "DELETE" }).then(r =>
       r.json()
     ),
+  getSuites: (planId) =>
+    fetch(`${API_BASE_URL}/test-plans/${planId}/suites`).then(r => r.json()),
+  addSuite: (planId, suiteId) =>
+    fetch(`${API_BASE_URL}/test-plans/${planId}/suites`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ suite_id: suiteId }),
+    }).then(r => r.json()),
+  removeSuite: (planId, suiteId) =>
+    fetch(`${API_BASE_URL}/test-plans/${planId}/suites/${suiteId}`, {
+      method: "DELETE",
+    }).then(r => r.json()),
+  execute: (planId, ambiente = "staging") =>
+    fetch(`${API_BASE_URL}/test-plans/${planId}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ambiente }),
+    }).then(r => r.json()),
 };
 
 // ==================== EXECUÇÕES ====================
@@ -106,6 +136,14 @@ export const executionsAPI = {
     ),
   getStats: () =>
     fetch(`${API_BASE_URL}/execucoes/stats/summary`).then(r => r.json()),
+  getResults: (execucaoId) =>
+    fetch(`${API_BASE_URL}/execucoes/${execucaoId}/results`).then(r => r.json()),
+  updateResult: (execucaoId, projetoId, data) =>
+    fetch(`${API_BASE_URL}/execucoes/${execucaoId}/results/${projetoId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
 };
 
 // ==================== RELATÓRIOS ====================
