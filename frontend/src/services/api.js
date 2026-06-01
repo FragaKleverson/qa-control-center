@@ -31,12 +31,6 @@ export const testSuitesAPI = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(r => r.json()),
-  update: (id, data) =>
-    fetch(`${API_BASE_URL}/test-suites/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
   delete: (id) =>
     fetch(`${API_BASE_URL}/test-suites/${id}`, { method: "DELETE" }).then(r =>
       r.json()
@@ -61,12 +55,6 @@ export const requirementsAPI = {
   create: (data) =>
     fetch(`${API_BASE_URL}/requirements`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
-  update: (id, data) =>
-    fetch(`${API_BASE_URL}/requirements/${id}`, {
-      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(r => r.json()),
@@ -124,12 +112,6 @@ export const executionsAPI = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(r => r.json()),
-  update: (id, data) =>
-    fetch(`${API_BASE_URL}/execucoes/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
   delete: (id) =>
     fetch(`${API_BASE_URL}/execucoes/${id}`, { method: "DELETE" }).then(r =>
       r.json()
@@ -149,12 +131,6 @@ export const executionsAPI = {
 // ==================== RELATÓRIOS ====================
 export const reportsAPI = {
   list: () => fetch(`${API_BASE_URL}/relatorios`).then(r => r.json()),
-  generate: (filters) =>
-    fetch(`${API_BASE_URL}/relatorios/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(filters),
-    }).then(r => r.json()),
 };
 
 // ==================== ESTATÍSTICAS GERAIS ====================

@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import "./Modal.css";
 
+// Modal genérico com fundo escuro, fechamento por ESC e clique no overlay
 export default function Modal({ isOpen, title, children, onClose }) {
   const modalRef = useRef(null);
 

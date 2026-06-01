@@ -21,6 +21,7 @@ export default function Projects() {
     loadProjects();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -31,6 +32,7 @@ export default function Projects() {
     }, 3000);
   }
 
+  // Busca todos os projetos da API
   async function loadProjects() {
     try {
       const data = await projectsAPI.list();
@@ -41,6 +43,7 @@ export default function Projects() {
     }
   }
 
+  // Cria um novo projeto via API; valida campos obrigatórios
   async function handleCreateProject(e) {
     e.preventDefault();
     setLoading(true);
@@ -75,6 +78,7 @@ export default function Projects() {
     }
   }
 
+  // Abre dialog de confirmação antes de deletar um projeto
   function handleDeleteProject(id) {
     setConfirmState({
       isOpen: true,
@@ -96,7 +100,7 @@ export default function Projects() {
 
   return (
     <div className="page">
-      <h1>📁 Projects</h1>
+      <h1>Projects</h1>
       <p>Manage and organize your test projects</p>
 
       <div className="page-content">

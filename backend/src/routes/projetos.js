@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { projectsService } = require("../services");
 
-console.log("🔥 projetos.js carregado");
-
 // GET - Listar todos os projetos
 router.get("/", async (req, res) => {
   try {

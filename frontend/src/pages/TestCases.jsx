@@ -15,10 +15,12 @@ const EMPTY_DOC = {
   cenarios: [{ nome: "", tipo: "Happy Path", passos: "" }],
 };
 
+// Formata o ID numérico para o padrão TCxxxx (ex: 1 → TC0001)
 function formatTCId(id) {
   return `TC${String(id).padStart(4, "0")}`;
 }
 
+// Ícone SVG para o botão de edição na tabela
 function PencilIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -51,17 +53,20 @@ export default function TestCases() {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [doc, setDoc] = useState(EMPTY_DOC);
+  const [viewingTC, setViewingTC] = useState(null);
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
 
   useEffect(() => { loadTestCases(); }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
   }
 
+  // Busca todos os test cases da API e atualiza a lista
   async function loadTestCases() {
     try {
       const data = await projectsAPI.list();
@@ -72,12 +77,19 @@ export default function TestCases() {
     }
   }
 
+  // Abre o modal de visualização read-only de um test case
+  function openViewModal(tc) {
+    setViewingTC(tc);
+  }
+
+  // Abre o modal para criação de novo test case com campos zerados
   function openAddModal() {
     setEditingId(null);
     setDoc({ ...EMPTY_DOC, cenarios: [{ nome: "", tipo: "Happy Path", passos: "" }] });
     setIsModalOpen(true);
   }
 
+  // Abre o modal de edição preenchido com os dados do test case selecionado
   function openEditModal(tc) {
     setEditingId(tc.id);
     setDoc({
@@ -92,14 +104,17 @@ export default function TestCases() {
     setIsModalOpen(true);
   }
 
+  // Atualiza um campo do documento sendo editado
   function updateField(field, value) {
     setDoc((prev) => ({ ...prev, [field]: value }));
   }
 
+  // Atualiza um campo do único cenário (sempre índice 0)
   function updateCenario(field, value) {
     setDoc((prev) => ({ ...prev, cenarios: [{ ...prev.cenarios[0], [field]: value }] }));
   }
 
+  // Valida e persiste o test case (cria ou atualiza conforme editingId)
   async function saveTestCase() {
     setLoading(true);
     const hasEmpty = doc.cenarios.some((c) => !c.nome.trim() || !c.tipo.trim() || !c.passos.trim());
@@ -184,8 +199,13 @@ export default function TestCases() {
                       onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                     >
-                      <td style={{ ...tdStyle, fontFamily: "monospace", fontWeight: "700", color: "#6366f1", whiteSpace: "nowrap" }}>
-                        {formatTCId(tc.id)}
+                      <td style={{ ...tdStyle, fontFamily: "monospace", fontWeight: "700", whiteSpace: "nowrap" }}>
+                        <button
+                          onClick={() => openViewModal(tc)}
+                          style={{ background: "none", color: "#6366f1", padding: "2px 4px", fontFamily: "monospace", fontWeight: "700", fontSize: "14px", boxShadow: "none", transform: "none", textDecoration: "underline", cursor: "pointer" }}
+                        >
+                          {formatTCId(tc.id)}
+                        </button>
                       </td>
                       <td style={{ ...tdStyle, maxWidth: "340px" }}>
                         <span
@@ -275,6 +295,65 @@ export default function TestCases() {
             <button onClick={() => setIsModalOpen(false)} style={{ background: "#6b7280" }}>Cancelar</button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal: Visualização read-only */}
+      <Modal
+        isOpen={!!viewingTC}
+        title={viewingTC ? formatTCId(viewingTC.id) : ""}
+        onClose={() => setViewingTC(null)}
+      >
+        {viewingTC && (
+          <div style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: "4px" }}>
+            <div style={{ marginBottom: "16px" }}>
+              <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Título</p>
+              <p style={{ margin: 0, fontSize: "16px", fontWeight: "600", color: "#111827" }}>{viewingTC.titulo}</p>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Descrição</p>
+              <p style={{ margin: 0, color: "#374151", lineHeight: "1.6" }}>{viewingTC.descricao}</p>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <p style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Feature</p>
+              <code style={{ display: "inline-block", background: "#f3f4f6", padding: "4px 10px", borderRadius: "6px", fontSize: "13px", color: "#374151" }}>
+                {viewingTC.feature}
+              </code>
+            </div>
+
+            {Array.isArray(viewingTC.cenarios) && viewingTC.cenarios.length > 0 && (
+              <div>
+                {viewingTC.cenarios.map((c, i) => (
+                  <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                      <span style={{ fontWeight: "700", fontSize: "14px", color: "#111827" }}>{c.nome}</span>
+                      <span style={{ background: "#e0e7ff", color: "#4338ca", padding: "2px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{c.tipo}</span>
+                    </div>
+                    <pre style={{ margin: 0, background: "#1e1e2e", color: "#cdd6f4", padding: "14px", borderRadius: "6px", fontSize: "13px", lineHeight: "1.7", overflowX: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace" }}>
+                      {c.passos}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "16px", borderTop: "1px solid #e5e7eb", marginTop: "4px" }}>
+              <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+                {viewingTC.created_at ? new Date(viewingTC.created_at).toLocaleDateString("pt-BR") : ""}
+              </span>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => { setViewingTC(null); openEditModal(viewingTC); }}
+                  style={{ background: "#e0e7ff", color: "#4338ca", padding: "8px 18px", fontSize: "13px", boxShadow: "none", transform: "none" }}
+                >
+                  Editar
+                </button>
+                <button onClick={() => setViewingTC(null)} style={{ background: "#6b7280" }}>Fechar</button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {toast.message && (

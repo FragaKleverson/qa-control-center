@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { requirementsService } = require("../services");
 
-console.log("🔥 requirements.js carregado");
-
 // GET - Listar todos os requirements
 router.get("/", async (req, res) => {
   try {

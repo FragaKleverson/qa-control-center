@@ -22,6 +22,7 @@ export default function Requirements() {
     loadRequirements();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -32,6 +33,7 @@ export default function Requirements() {
     }, 3000);
   }
 
+  // Busca todos os requirements da API
   async function loadRequirements() {
     try {
       const data = await requirementsAPI.list();
@@ -42,6 +44,7 @@ export default function Requirements() {
     }
   }
 
+  // Cria um novo requirement via API; valida campo título
   async function handleCreateRequirement(e) {
     e.preventDefault();
     setLoading(true);
@@ -73,6 +76,7 @@ export default function Requirements() {
     }
   }
 
+  // Abre dialog de confirmação antes de deletar um requirement
   function handleDeleteRequirement(id) {
     setConfirmState({
       isOpen: true,
@@ -92,6 +96,7 @@ export default function Requirements() {
     });
   }
 
+  // Retorna a cor hex correspondente à prioridade do requirement
   const getPriorityColor = (prioridade) => {
     switch (prioridade) {
       case "High":
@@ -107,7 +112,7 @@ export default function Requirements() {
 
   return (
     <div className="page">
-      <h1>📝 Requirements</h1>
+      <h1>Requirements</h1>
       <p>Manage test requirements and specifications</p>
 
       <div className="page-content">

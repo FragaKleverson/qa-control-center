@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { statsService } = require("../services");
 
-console.log("🔥 stats.js carregado");
-
 // ============================
 // OBTER ESTATÍSTICAS GERAIS
 // ============================

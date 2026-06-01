@@ -1,4 +1,6 @@
+// Renderiza os passos Gherkin de um cenário com coloração por tipo (given/when/then)
 export default function GherkinDisplay({ testCase }) {
+  // Converte texto Gherkin livre em array de steps tipados
   const parseGherkin = (text) => {
     if (!text) return [];
     

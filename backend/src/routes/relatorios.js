@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { reportsService } = require("../services");
 
-console.log("🔥 relatorios.js carregado");
-
 // GET - Listar todos os relatórios/execuções
 router.get("/", async (req, res) => {
   try {

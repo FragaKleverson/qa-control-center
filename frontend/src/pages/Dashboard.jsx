@@ -1,15 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import GherkinDisplay from "../components/GherkinDisplay";
-import { statsAPI, projectsAPI, executionsAPI } from "../services/api";
+import { projectsAPI, executionsAPI } from "../services/api";
 import "./Dashboard.css";
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    totalProjects: 0,
-    totalTestCases: 0,
-    totalExecutions: 0
-  });
   const [projects, setProjects] = useState([]);
   const [testCases, setTestCases] = useState([]);
   const [executions, setExecutions] = useState([]);
@@ -23,6 +18,7 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -33,15 +29,14 @@ export default function Dashboard() {
     }, 3000);
   }
 
+  // Busca projetos e execuções em paralelo e alimenta os cards
   async function loadDashboard() {
     try {
-      const [statsData, projectsData, executionsData] = await Promise.all([
-        statsAPI.getDashboard(),
+      const [projectsData, executionsData] = await Promise.all([
         projectsAPI.list(),
         executionsAPI.list()
       ]);
 
-      setStats(statsData.stats || statsData);
       setProjects(projectsData);
       setTestCases(projectsData);
       setExecutions(executionsData);
@@ -51,18 +46,21 @@ export default function Dashboard() {
     }
   }
 
+  // Abre o modal de detalhe de um item (projeto, test case ou execução)
   const openModal = (type, item) => {
     setModalType(type);
     setSelectedItem(item);
     setIsModalOpen(true);
   };
 
+  // Fecha o modal e limpa o item selecionado
   const closeModal = () => {
     setIsModalOpen(false);
     setModalType(null);
     setSelectedItem(null);
   };
 
+  // Renderiza o conteúdo do modal conforme o tipo do item selecionado
   const renderModalContent = () => {
     if (!selectedItem) return null;
 

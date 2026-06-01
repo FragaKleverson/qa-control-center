@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { executionsService } = require("../services");
 
-console.log("🔥 execucoes.js carregado");
-
 // GET - Listar todas as execuções
 router.get("/", async (req, res) => {
   try {

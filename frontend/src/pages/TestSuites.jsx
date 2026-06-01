@@ -22,12 +22,14 @@ export default function TestSuites() {
     loadProjects();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
   }
 
+  // Busca todas as test suites da API
   async function loadSuites() {
     try {
       const data = await testSuitesAPI.list();
@@ -38,6 +40,7 @@ export default function TestSuites() {
     }
   }
 
+  // Busca todos os test cases (projetos) para exibir no modal de vínculo
   async function loadProjects() {
     try {
       const data = await projectsAPI.list();
@@ -47,6 +50,7 @@ export default function TestSuites() {
     }
   }
 
+  // Abre o modal de gestão de test cases de uma suite e carrega os vinculados
   async function openCasesModal(suite) {
     setSelectedSuite(suite);
     setIsCasesModalOpen(true);
@@ -59,6 +63,7 @@ export default function TestSuites() {
     }
   }
 
+  // Vincula um test case à suite selecionada
   async function handleAddCase(projetoId) {
     try {
       await testSuitesAPI.addCase(selectedSuite.id, projetoId);
@@ -71,6 +76,7 @@ export default function TestSuites() {
     }
   }
 
+  // Remove o vínculo de um test case da suite selecionada
   async function handleRemoveCase(projetoId) {
     try {
       await testSuitesAPI.removeCase(selectedSuite.id, projetoId);
@@ -83,6 +89,7 @@ export default function TestSuites() {
     }
   }
 
+  // Cria uma nova test suite via API; valida campo nome
   async function handleCreateSuite(e) {
     e.preventDefault();
     setLoading(true);
@@ -106,6 +113,7 @@ export default function TestSuites() {
     }
   }
 
+  // Abre dialog de confirmação antes de deletar uma suite
   function handleDeleteSuite(id) {
     setConfirmState({
       isOpen: true,

@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { testSuitesService } = require("../services");
 
-console.log("🔥 testSuites.js carregado");
-
 // GET - Listar todos os test suites
 router.get("/", async (req, res) => {
   try {

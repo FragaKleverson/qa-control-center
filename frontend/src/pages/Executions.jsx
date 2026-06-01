@@ -14,6 +14,7 @@ const STATUS_OPTIONS = [
   { value: "skipped",  label: "Skipped",  bg: "#f3f4f6", color: "#6b7280" },
 ];
 
+// Retorna o objeto de estilo (bg, color, label) para um determinado status
 function getStatusInfo(status) {
   return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
 }
@@ -38,12 +39,14 @@ export default function Executions() {
     loadSuites();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
   }
 
+  // Busca todas as execuções com estatísticas agregadas
   async function loadExecutions() {
     try {
       const data = await executionsAPI.list();
@@ -54,6 +57,7 @@ export default function Executions() {
     }
   }
 
+  // Busca todas as test suites para o select do formulário de nova execução
   async function loadSuites() {
     try {
       const data = await testSuitesAPI.list();
@@ -63,6 +67,7 @@ export default function Executions() {
     }
   }
 
+  // Abre/fecha o painel de test cases de uma execução; carrega resultados sob demanda
   async function toggleExpand(executionId) {
     if (expandedId === executionId) {
       setExpandedId(null);
@@ -83,6 +88,7 @@ export default function Executions() {
     }
   }
 
+  // Atualiza o status de um test case dentro de uma execução e recarrega o status geral
   async function handleUpdateResultStatus(execucaoId, projetoId, newStatus) {
     try {
       await executionsAPI.updateResult(execucaoId, projetoId, { status: newStatus });
@@ -102,6 +108,7 @@ export default function Executions() {
     }
   }
 
+  // Cria uma nova execução manual a partir do formulário
   async function handleRunExecution(e) {
     e.preventDefault();
     setLoading(true);
@@ -125,6 +132,7 @@ export default function Executions() {
     }
   }
 
+  // Abre dialog de confirmação antes de deletar uma execução
   function handleDeleteExecution(id) {
     setConfirmState({
       isOpen: true,
@@ -146,6 +154,7 @@ export default function Executions() {
     });
   }
 
+  // Abre o modal de detalhe de um resultado de test case
   function openResultDetail(result) {
     setSelectedResult(result);
     setIsDetailOpen(true);

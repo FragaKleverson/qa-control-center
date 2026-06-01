@@ -1,3 +1,5 @@
+// Diálogo de confirmação reutilizável com animação fade+pop
+// danger=true: botão confirmar vermelho | danger=false: botão verde
 export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel, danger = true }) {
   if (!isOpen) return null;
 

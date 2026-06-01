@@ -25,12 +25,14 @@ export default function TestPlan() {
     loadAllSuites();
   }, []);
 
+  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
   }
 
+  // Busca todos os test plans da API
   async function loadPlans() {
     try {
       const data = await testPlansAPI.list();
@@ -41,6 +43,7 @@ export default function TestPlan() {
     }
   }
 
+  // Busca todas as suites para exibir no modal de vínculo
   async function loadAllSuites() {
     try {
       const data = await testSuitesAPI.list();
@@ -50,6 +53,7 @@ export default function TestPlan() {
     }
   }
 
+  // Abre o modal de gestão de suites de um plan e carrega as vinculadas
   async function openSuitesModal(plan) {
     setSelectedPlan(plan);
     setIsSuitesModalOpen(true);
@@ -62,6 +66,7 @@ export default function TestPlan() {
     }
   }
 
+  // Vincula uma suite ao plan selecionado
   async function handleAddSuite(suiteId) {
     try {
       await testPlansAPI.addSuite(selectedPlan.id, suiteId);
@@ -74,6 +79,7 @@ export default function TestPlan() {
     }
   }
 
+  // Remove o vínculo de uma suite do plan selecionado
   async function handleRemoveSuite(suiteId) {
     try {
       await testPlansAPI.removeSuite(selectedPlan.id, suiteId);
@@ -86,6 +92,7 @@ export default function TestPlan() {
     }
   }
 
+  // Abre dialog de confirmação e cria uma execução a partir de todas as suites do plan
   function handleExecutePlan(plan, ambiente = "staging") {
     setConfirmState({
       isOpen: true,
@@ -108,6 +115,7 @@ export default function TestPlan() {
     });
   }
 
+  // Cria um novo test plan via API; valida campo título
   async function handleCreatePlan(e) {
     e.preventDefault();
     setLoading(true);
@@ -131,6 +139,7 @@ export default function TestPlan() {
     }
   }
 
+  // Abre dialog de confirmação antes de deletar um test plan
   function handleDeletePlan(id) {
     setConfirmState({
       isOpen: true,

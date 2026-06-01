@@ -2,8 +2,6 @@ const express = require("express");
 const router = express.Router();
 const { testPlansService } = require("../services");
 
-console.log("🔥 testPlans.js carregado");
-
 // GET - Listar todos os test plans
 router.get("/", async (req, res) => {
   try {
