@@ -3,25 +3,23 @@ const router = express.Router();
 const { requirementsService } = require("../services");
 
 // GET - Listar todos os requirements
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const requirements = await requirementsService.listAll();
     res.json(requirements);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET - Obter requirement por ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const requirement = await requirementsService.getById(req.params.id);
     if (!requirement) return res.status(404).json({ error: "Requirement não encontrado" });
     res.json(requirement);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

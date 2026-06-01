@@ -18,7 +18,7 @@ const projectsService = {
 
   create: async (data) => {
     const { titulo, descricao, feature, cenarios = [] } = data;
-    if (!titulo || !descricao || !feature) {
+    if (!titulo || !titulo.trim() || !descricao || !descricao.trim() || !feature || !feature.trim()) {
       throw new Error("Título, descrição e feature são obrigatórios");
     }
     const result = await query(
@@ -128,7 +128,7 @@ const requirementsService = {
 
   create: async (data) => {
     const { titulo, descricao = "", status = "Open", prioridade = "Medium" } = data;
-    if (!titulo) throw new Error("Título é obrigatório");
+    if (!titulo || !titulo.trim()) throw new Error("Título é obrigatório");
     const result = await query(
       "INSERT INTO requirements (titulo, descricao, status, prioridade) VALUES ($1, $2, $3, $4) RETURNING *",
       [titulo, descricao, status, prioridade]

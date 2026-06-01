@@ -3,25 +3,23 @@ const router = express.Router();
 const { testSuitesService } = require("../services");
 
 // GET - Listar todos os test suites
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const suites = await testSuitesService.listAll();
     res.json(suites);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET - Obter test suite por ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const suite = await testSuitesService.getById(req.params.id);
     if (!suite) return res.status(404).json({ error: "Test suite não encontrada" });
     res.json(suite);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -59,13 +57,12 @@ router.delete("/:id", async (req, res) => {
 });
 
 // GET - Listar test cases de uma suite
-router.get("/:id/cases", async (req, res) => {
+router.get("/:id/cases", async (req, res, next) => {
   try {
     const cases = await testSuitesService.getCases(req.params.id);
     res.json(cases);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

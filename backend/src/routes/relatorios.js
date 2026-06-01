@@ -3,13 +3,12 @@ const router = express.Router();
 const { reportsService } = require("../services");
 
 // GET - Listar todos os relatórios/execuções
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const reports = await reportsService.listAll();
     res.json(reports);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

@@ -4,7 +4,118 @@
     "description": "Complete API collection for QA Control Center application",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registerToken",
+      "value": "SUBSTITUA_PELO_VALOR_DE_REGISTER_TOKEN_NO_ENV",
+      "type": "string"
+    }
+  ],
   "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-register-token",
+                "value": "{{registerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Tester\",\n  \"email\": \"tester@qa.dev\",\n  \"password\": \"Test@1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Cria um novo usuario. Requer o header x-register-token com o valor de REGISTER_TOKEN configurado no servidor."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    console.log('Token salvo na variavel {{token}}');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tester@qa.dev\",\n  \"password\": \"Test@1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Faz login e salva automaticamente o JWT na variavel {{token}} da collection."
+          }
+        }
+      ]
+    },
     {
       "name": "Projects",
       "item": [
@@ -14,11 +125,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/projetos",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["projetos"]
+              "raw": "{{baseUrl}}/projetos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projetos"
+              ]
             }
           }
         },
@@ -37,11 +150,13 @@
               "raw": "{\n  \"titulo\": \"Login Feature\",\n  \"descricao\": \"Tests for user login functionality\",\n  \"feature\": \"Feature: User Authentication\",\n  \"cenarios\": []\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/projetos",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["projetos"]
+              "raw": "{{baseUrl}}/projetos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projetos"
+              ]
             }
           }
         },
@@ -60,11 +175,14 @@
               "raw": "{\n  \"titulo\": \"Login Feature Updated\",\n  \"descricao\": \"Updated tests for user login\",\n  \"feature\": \"Feature: User Authentication\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/projetos/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["projetos", "1"]
+              "raw": "{{baseUrl}}/projetos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projetos",
+                "1"
+              ]
             }
           }
         },
@@ -74,11 +192,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/projetos/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["projetos", "1"]
+              "raw": "{{baseUrl}}/projetos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "projetos",
+                "1"
+              ]
             }
           }
         }
@@ -93,11 +214,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/test-suites",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-suites"]
+              "raw": "{{baseUrl}}/test-suites",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-suites"
+              ]
             }
           }
         },
@@ -116,11 +239,13 @@
               "raw": "{\n  \"nome\": \"Smoke Tests\",\n  \"descricao\": \"Quick tests to verify basic functionality\",\n  \"projeto_id\": 1\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/test-suites",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-suites"]
+              "raw": "{{baseUrl}}/test-suites",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-suites"
+              ]
             }
           }
         },
@@ -139,11 +264,14 @@
               "raw": "{\n  \"nome\": \"Smoke Tests Updated\",\n  \"descricao\": \"Updated smoke tests\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/test-suites/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-suites", "1"]
+              "raw": "{{baseUrl}}/test-suites/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-suites",
+                "1"
+              ]
             }
           }
         },
@@ -153,11 +281,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/test-suites/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-suites", "1"]
+              "raw": "{{baseUrl}}/test-suites/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-suites",
+                "1"
+              ]
             }
           }
         }
@@ -172,11 +303,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/requirements",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["requirements"]
+              "raw": "{{baseUrl}}/requirements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requirements"
+              ]
             }
           }
         },
@@ -195,11 +328,13 @@
               "raw": "{\n  \"titulo\": \"User must be able to login\",\n  \"descricao\": \"System should validate user credentials\",\n  \"status\": \"Open\",\n  \"prioridade\": \"High\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/requirements",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["requirements"]
+              "raw": "{{baseUrl}}/requirements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requirements"
+              ]
             }
           }
         },
@@ -218,11 +353,14 @@
               "raw": "{\n  \"titulo\": \"User must be able to login\",\n  \"descricao\": \"System should validate user credentials securely\",\n  \"status\": \"In Progress\",\n  \"prioridade\": \"High\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/requirements/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["requirements", "1"]
+              "raw": "{{baseUrl}}/requirements/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requirements",
+                "1"
+              ]
             }
           }
         },
@@ -232,11 +370,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/requirements/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["requirements", "1"]
+              "raw": "{{baseUrl}}/requirements/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "requirements",
+                "1"
+              ]
             }
           }
         }
@@ -251,11 +392,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/test-plans",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-plans"]
+              "raw": "{{baseUrl}}/test-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-plans"
+              ]
             }
           }
         },
@@ -274,11 +417,13 @@
               "raw": "{\n  \"titulo\": \"Sprint 1 Testing\",\n  \"descricao\": \"Test plan for sprint 1 deliverables\",\n  \"escopo\": \"Login and Registration features\",\n  \"objetivo\": \"Ensure all features work as expected\",\n  \"ambiente\": \"QA Environment\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/test-plans",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-plans"]
+              "raw": "{{baseUrl}}/test-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-plans"
+              ]
             }
           }
         },
@@ -297,11 +442,14 @@
               "raw": "{\n  \"titulo\": \"Sprint 1 Testing\",\n  \"descricao\": \"Updated test plan for sprint 1\",\n  \"escopo\": \"Login, Registration and Dashboard\",\n  \"objetivo\": \"Validate all features work correctly\",\n  \"ambiente\": \"Staging Environment\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/test-plans/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-plans", "1"]
+              "raw": "{{baseUrl}}/test-plans/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-plans",
+                "1"
+              ]
             }
           }
         },
@@ -311,11 +459,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/test-plans/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["test-plans", "1"]
+              "raw": "{{baseUrl}}/test-plans/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test-plans",
+                "1"
+              ]
             }
           }
         }
@@ -330,11 +481,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/execucoes",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["execucoes"]
+              "raw": "{{baseUrl}}/execucoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "execucoes"
+              ]
             }
           }
         },
@@ -353,11 +506,13 @@
               "raw": "{\n  \"suite_id\": 1,\n  \"ambiente\": \"staging\",\n  \"status\": \"pending\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/execucoes",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["execucoes"]
+              "raw": "{{baseUrl}}/execucoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "execucoes"
+              ]
             }
           }
         },
@@ -376,11 +531,14 @@
               "raw": "{\n  \"status\": \"passed\",\n  \"resultado\": \"All tests passed successfully\"\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/execucoes/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["execucoes", "1"]
+              "raw": "{{baseUrl}}/execucoes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "execucoes",
+                "1"
+              ]
             }
           }
         },
@@ -390,11 +548,15 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/execucoes/stats/summary",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["execucoes", "stats", "summary"]
+              "raw": "{{baseUrl}}/execucoes/stats/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "execucoes",
+                "stats",
+                "summary"
+              ]
             }
           }
         },
@@ -404,11 +566,14 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/execucoes/1",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["execucoes", "1"]
+              "raw": "{{baseUrl}}/execucoes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "execucoes",
+                "1"
+              ]
             }
           }
         }
@@ -423,11 +588,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/relatorios",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["relatorios"]
+              "raw": "{{baseUrl}}/relatorios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "relatorios"
+              ]
             }
           }
         },
@@ -446,11 +613,14 @@
               "raw": "{\n  \"startDate\": \"2026-05-01\",\n  \"endDate\": \"2026-05-31\",\n  \"suite_id\": 1\n}"
             },
             "url": {
-              "raw": "http://localhost:3001/relatorios/generate",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["relatorios", "generate"]
+              "raw": "{{baseUrl}}/relatorios/generate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "relatorios",
+                "generate"
+              ]
             }
           }
         }
@@ -465,11 +635,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3001/stats",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3001",
-              "path": ["stats"]
+              "raw": "{{baseUrl}}/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stats"
+              ]
             }
           }
         }

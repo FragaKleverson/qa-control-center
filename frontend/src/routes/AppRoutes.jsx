@@ -1,6 +1,8 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Layout from "../components/Layout";
+import ProtectedRoute from "./ProtectedRoute";
+import Login from "../pages/Login";
 
 import Dashboard from "../pages/Dashboard";
 import Projects from "../pages/Projects";
@@ -14,7 +16,15 @@ import Reports from "../pages/Reports";
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/" element={<Dashboard />} />
 
         <Route
@@ -52,6 +62,8 @@ export default function AppRoutes() {
           element={<Reports />}
         />
       </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -5,13 +5,12 @@ const { statsService } = require("../services");
 // ============================
 // OBTER ESTATÍSTICAS GERAIS
 // ============================
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const stats = await statsService.getDashboard();
     res.json(stats);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

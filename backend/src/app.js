@@ -2,6 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const hpp = require("hpp");
 const projetosRoutes = require("./routes/projetos");
 const testSuitesRoutes = require("./routes/testSuites");
 const requirementsRoutes = require("./routes/requirements");
@@ -9,20 +12,115 @@ const testPlansRoutes = require("./routes/testPlans");
 const statsRoutes = require("./routes/stats");
 const execucoesDetalhado = require("./routes/execucoesDetalhado");
 const relatorios = require("./routes/relatorios");
+const authRoutes = require("./routes/auth");
+const authMiddleware = require("./middleware/auth");
+const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-
 /* =========================
-   MIDDLEWARES
+   SEGURANÇA — HTTP HEADERS
+   Helmet define cabeçalhos de segurança HTTP:
+   X-Frame-Options, X-XSS-Protection, X-Content-Type-Options,
+   Strict-Transport-Security, Content-Security-Policy, etc.
 ========================= */
-app.use(cors());
-app.use(bodyParser.json({ limit: "10mb" }));
-// Log de requisições HTTP: método, rota, status e tempo de resposta
-app.use(morgan("dev"));
+app.use(helmet());
 
 /* =========================
-   ROTAS
+   CORS
+   Permite apenas origens listadas em ALLOWED_ORIGINS (env).
+   Requisições sem cabeçalho Origin (Postman, curl, server-to-server)
+   são permitidas; origens de browser desconhecidas são bloqueadas.
+========================= */
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Requisições sem Origin (mobile apps, ferramentas, APIs internas)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error("Origem não permitida pelo CORS"), false);
+    },
+    optionsSuccessStatus: 200,
+  })
+);
+
+/* =========================
+   RATE LIMITING
+   Limita cada IP a RATE_LIMIT_MAX requisições por janela de tempo.
+   Previne ataques de força-bruta e DoS.
+   Desativado em ambiente de teste para não interferir nas suites.
+========================= */
+if (process.env.NODE_ENV !== "test") {
+  const limiter = rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
+    max: Number(process.env.RATE_LIMIT_MAX) || 200,
+    standardHeaders: true,  // Retorna info de limite nos headers RateLimit-*
+    legacyHeaders: false,   // Desativa headers X-RateLimit-* obsoletos
+    message: { error: "Muitas requisições. Tente novamente em alguns minutos." },
+  });
+  app.use(limiter);
+}
+
+/* =========================
+   HTTP PARAMETER POLLUTION
+   Previne poluição de parâmetros via query string duplicada.
+   Ex: GET /projetos?id=1&id=2 poderia causar comportamentos inesperados.
+========================= */
+app.use(hpp());
+
+/* =========================
+   BODY PARSER
+   Limite reduzido de 10mb para 500kb — payloads legítimos desta API
+   não excedem esse tamanho. Limites altos facilitam ataques de DoS.
+========================= */
+app.use(bodyParser.json({ limit: "500kb" }));
+
+/* =========================
+   LOGS HTTP
+   Formato "combined" em produção (IP, user-agent, referrer — auditável).
+   Formato "dev" em desenvolvimento (colorido, compacto).
+========================= */
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+/* =========================
+   VALIDAÇÃO DE PARÂMETROS DE ROTA
+   Garante que parâmetros :id, :suiteId, :projetoId
+   sejam inteiros positivos antes de chegar aos serviços.
+   Defesa extra contra payloads malformados.
+========================= */
+const numericParamValidator = (req, res, next, value) => {
+  if (!/^\d+$/.test(value)) {
+    return res.status(400).json({ error: "ID inválido" });
+  }
+  next();
+};
+app.param("id", numericParamValidator);
+app.param("suiteId", numericParamValidator);
+app.param("projetoId", numericParamValidator);
+
+/* =========================
+   ROTAS PÚBLICAS (antes do middleware de auth)
+   /auth/login e /auth/register não exigem token.
+========================= */
+app.use("/auth", authRoutes);
+
+/* =========================
+   AUTENTICAÇÃO JWT
+   Protege todas as rotas declaradas abaixo.
+   Desativado em ambiente de teste (NODE_ENV=test) para não interferir
+   nos testes de integração existentes — auth é testado em auth.test.js.
+========================= */
+if (process.env.NODE_ENV !== "test") {
+  app.use(authMiddleware);
+}
+
+/* =========================
+   ROTAS PROTEGIDAS
 ========================= */
 app.use("/projetos", projetosRoutes);
 app.use("/test-suites", testSuitesRoutes);
@@ -31,5 +129,14 @@ app.use("/test-plans", testPlansRoutes);
 app.use("/stats", statsRoutes);
 app.use("/execucoes", execucoesDetalhado);
 app.use("/relatorios", relatorios);
+
+/* =========================
+   HANDLER DE ERROS GLOBAL
+   Deve ser o ÚLTIMO middleware.
+   Captura erros passados via next(err) e garante que detalhes
+   internos (stack traces, mensagens de DB) nunca sejam expostos
+   em produção.
+========================= */
+app.use(errorHandler);
 
 module.exports = app;

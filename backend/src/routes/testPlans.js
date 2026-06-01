@@ -3,25 +3,23 @@ const router = express.Router();
 const { testPlansService } = require("../services");
 
 // GET - Listar todos os test plans
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const plans = await testPlansService.listAll();
     res.json(plans);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET - Obter test plan por ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const plan = await testPlansService.getById(req.params.id);
     if (!plan) return res.status(404).json({ error: "Test plan não encontrado" });
     res.json(plan);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -59,13 +57,12 @@ router.delete("/:id", async (req, res) => {
 });
 
 // GET - Listar suites de um plan
-router.get("/:id/suites", async (req, res) => {
+router.get("/:id/suites", async (req, res, next) => {
   try {
     const suites = await testPlansService.getSuites(req.params.id);
     res.json(suites);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
