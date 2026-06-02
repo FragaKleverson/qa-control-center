@@ -269,11 +269,17 @@ const executionsService = {
     const result = await query(
       `SELECT e.*,
         ts.nome AS nome_suite,
+        ts.projeto_id,
+        p.titulo AS nome_projeto,
         (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id) AS total_cases,
-        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'passed') AS passed_cases,
-        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'failed') AS failed_cases
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'passed')  AS passed_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'failed')  AS failed_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'blocked') AS blocked_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'skipped') AS skipped_cases,
+        (SELECT COUNT(*) FROM execution_results er WHERE er.execucao_id = e.id AND er.status = 'pending') AS pending_cases
        FROM execucoes e
        LEFT JOIN test_suites ts ON ts.id = e.suite_id
+       LEFT JOIN projetos p ON p.id = ts.projeto_id
        ORDER BY e.created_at DESC`
     );
     return result.rows;
@@ -323,8 +329,12 @@ const executionsService = {
     return result.rows;
   },
 
-  // Atualiza status de um test case específico dentro de uma execução
+  // Atualiza status de um test case específico dentro de uma execução (não altera o status geral)
   updateResult: async (execucaoId, projetoId, status, comentario) => {
+    // Bloqueia edição se a execução já foi finalizada
+    const execCheck = await query("SELECT finalized FROM execucoes WHERE id = $1", [execucaoId]);
+    if (execCheck.rows[0]?.finalized) throw new Error("Execução finalizada — não é possível editar os resultados.");
+
     const result = await query(
       `UPDATE execution_results
        SET status = $1, comentario = $2, updated_at = CURRENT_TIMESTAMP
@@ -334,38 +344,81 @@ const executionsService = {
     );
     if (result.rows.length === 0) throw new Error("Resultado não encontrado");
 
-    // Atualizar status geral da execução com base nos resultados
+    // Marca execução como 'running' enquanto há casos pendentes
     await query(
-      `UPDATE execucoes
-       SET status = CASE
-         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status = 'pending') > 0 THEN 'running'
-         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status = 'failed') > 0 THEN 'failed'
-         WHEN (SELECT COUNT(*) FROM execution_results WHERE execucao_id = $1 AND status != 'passed') = 0 THEN 'passed'
-         ELSE 'running'
-       END,
-       updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
+      `UPDATE execucoes SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [execucaoId]
     );
 
     return result.rows[0];
   },
 
-  getStats: async () => {
+  // Finaliza a execução: calcula o status final com base nos resultados e bloqueia edição
+  finalize: async (execucaoId) => {
+    const execCheck = await query("SELECT finalized FROM execucoes WHERE id = $1", [execucaoId]);
+    if (!execCheck.rows[0]) throw new Error("Execução não encontrada");
+    if (execCheck.rows[0].finalized) throw new Error("Execução já foi finalizada.");
+
+    // Calcular status final: se algum falhou → 'failed'; se todos passaram → 'passed'; caso contrário → 'completed'
+    const counts = await query(
+      `SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'passed'  THEN 1 ELSE 0 END) AS passed,
+        SUM(CASE WHEN status = 'failed'  THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
+       FROM execution_results WHERE execucao_id = $1`,
+      [execucaoId]
+    );
+    const c = counts.rows[0];
+    const total   = parseInt(c.total)   || 0;
+    const passed  = parseInt(c.passed)  || 0;
+    const failed  = parseInt(c.failed)  || 0;
+    const pending = parseInt(c.pending) || 0;
+
+    let finalStatus = 'completed';
+    if (failed > 0)                  finalStatus = 'failed';
+    else if (passed === total && total > 0) finalStatus = 'passed';
+    else if (pending > 0)            finalStatus = 'completed'; // alguns skipped/blocked mas sem failed
+
     const result = await query(
-      `SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) as passed,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
-      FROM execucoes`
+      `UPDATE execucoes SET status = $1, finalized = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *`,
+      [finalStatus, execucaoId]
+    );
+    return result.rows[0];
+  },
+
+  getStats: async () => {
+    // Conta ao nível de test cases (execution_results), não de execuções
+    const result = await query(
+      `SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN er.status = 'passed'  THEN 1 ELSE 0 END) AS passed,
+        SUM(CASE WHEN er.status = 'failed'  THEN 1 ELSE 0 END) AS failed,
+        SUM(CASE WHEN er.status = 'blocked' THEN 1 ELSE 0 END) AS blocked,
+        SUM(CASE WHEN er.status = 'skipped' THEN 1 ELSE 0 END) AS skipped,
+        SUM(CASE WHEN er.status = 'pending' THEN 1 ELSE 0 END) AS pending
+       FROM execution_results er`
     );
     const row = result.rows[0];
+
+    // Conta execuções finalizadas vs em andamento
+    const execResult = await query(
+      `SELECT
+        COUNT(*) AS total_exec,
+        SUM(CASE WHEN finalized = TRUE THEN 1 ELSE 0 END) AS finalized_exec
+       FROM execucoes`
+    );
+    const erow = execResult.rows[0];
+
     return {
-      total: parseInt(row.total) || 0,
-      passed: parseInt(row.passed) || 0,
-      failed: parseInt(row.failed) || 0,
-      pending: parseInt(row.pending) || 0
+      total:    parseInt(row.total)   || 0,
+      passed:   parseInt(row.passed)  || 0,
+      failed:   parseInt(row.failed)  || 0,
+      blocked:  parseInt(row.blocked) || 0,
+      skipped:  parseInt(row.skipped) || 0,
+      pending:  parseInt(row.pending) || 0,
+      totalExecutions:     parseInt(erow.total_exec)     || 0,
+      finalizedExecutions: parseInt(erow.finalized_exec) || 0,
     };
   }
 };
@@ -382,12 +435,20 @@ const reportsService = {
     );
 
     const suiteStats = await query(
-      `SELECT 
-        suite_id,
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) as passed,
-        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
-      FROM execucoes GROUP BY suite_id`
+      `SELECT
+        ts.id                                                                AS suite_id,
+        ts.nome,
+        COUNT(er.id)                                                         AS total,
+        SUM(CASE WHEN er.status = 'passed'  THEN 1 ELSE 0 END)              AS passed,
+        SUM(CASE WHEN er.status = 'failed'  THEN 1 ELSE 0 END)              AS failed,
+        SUM(CASE WHEN er.status = 'blocked' THEN 1 ELSE 0 END)              AS blocked,
+        SUM(CASE WHEN er.status = 'skipped' THEN 1 ELSE 0 END)              AS skipped,
+        SUM(CASE WHEN er.status = 'pending' THEN 1 ELSE 0 END)              AS pending
+       FROM test_suites ts
+       INNER JOIN execucoes e  ON e.suite_id  = ts.id
+       INNER JOIN execution_results er ON er.execucao_id = e.id
+       GROUP BY ts.id, ts.nome
+       ORDER BY ts.id`
     );
 
     return {
@@ -403,12 +464,13 @@ const reportsService = {
     const params = [];
 
     if (startDate) {
-      queryStr += ` AND created_at >= $${params.length + 1}`;
+      queryStr += ` AND created_at >= $${params.length + 1}::date`;
       params.push(startDate);
     }
 
     if (endDate) {
-      queryStr += ` AND created_at <= $${params.length + 1}`;
+      // Inclui o dia inteiro: < dia_seguinte
+      queryStr += ` AND created_at < ($${params.length + 1}::date + INTERVAL '1 day')`;
       params.push(endDate);
     }
 
@@ -422,12 +484,35 @@ const reportsService = {
     const result = await query(queryStr, params);
     const executions = result.rows;
 
-    // Calcular summary
+    // Busca os test cases de cada execução
+    const executionsWithCases = await Promise.all(
+      executions.map(async (ex) => {
+        const casesResult = await query(
+          `SELECT er.id, er.status, er.comentario, p.id AS projeto_id, p.titulo
+           FROM execution_results er
+           INNER JOIN projetos p ON p.id = er.projeto_id
+           WHERE er.execucao_id = $1
+           ORDER BY er.id ASC`,
+          [ex.id]
+        );
+        return { ...ex, testCases: casesResult.rows };
+      })
+    );
+
+    // Calcular summary ao nível de execução
     const total = executions.length;
     const passed = executions.filter(e => e.status === "passed").length;
     const failed = executions.filter(e => e.status === "failed").length;
     const pending = executions.filter(e => e.status === "pending").length;
     const successRate = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+
+    // Calcular totais de test cases
+    const allCases = executionsWithCases.flatMap(e => e.testCases);
+    const casesPassed  = allCases.filter(c => c.status === "passed").length;
+    const casesFailed  = allCases.filter(c => c.status === "failed").length;
+    const casesPending = allCases.filter(c => c.status === "pending").length;
+    const casesBlocked = allCases.filter(c => c.status === "blocked").length;
+    const casesSkipped = allCases.filter(c => c.status === "skipped").length;
 
     return {
       summary: {
@@ -435,9 +520,17 @@ const reportsService = {
         passed,
         failed,
         pending,
-        successRate: parseFloat(successRate)
+        successRate: parseFloat(successRate),
+        testCases: {
+          total: allCases.length,
+          passed: casesPassed,
+          failed: casesFailed,
+          pending: casesPending,
+          blocked: casesBlocked,
+          skipped: casesSkipped,
+        }
       },
-      executions
+      executions: executionsWithCases
     };
   }
 };
@@ -446,25 +539,55 @@ const reportsService = {
 const statsService = {
   getDashboard: async () => {
     try {
-      const totalProjects = await query("SELECT COUNT(*) as count FROM projetos");
-      const totalTestCases = await query("SELECT COUNT(*) as count FROM projetos WHERE cenarios IS NOT NULL");
-      const totalExecutions = await query("SELECT COUNT(*) as count FROM execucoes");
-      const recentProjects = await query("SELECT * FROM projetos ORDER BY created_at DESC LIMIT 5");
-      const recentExecutions = await query("SELECT * FROM execucoes ORDER BY created_at DESC LIMIT 5");
+      // Garante que a coluna finalized existe (migration segura para DBs já criados)
+      await query(`ALTER TABLE execucoes ADD COLUMN IF NOT EXISTS finalized BOOLEAN DEFAULT FALSE`);
+
+      const totalProjects    = await query("SELECT COUNT(*) as count FROM projetos");
+      const totalExecutions  = await query("SELECT COUNT(*) as count FROM execucoes");
+      const recentProjects   = await query("SELECT * FROM projetos ORDER BY created_at DESC LIMIT 5");
+      const recentExecutions = await query(
+        `SELECT e.*, ts.nome AS nome_suite
+         FROM execucoes e
+         LEFT JOIN test_suites ts ON ts.id = e.suite_id
+         ORDER BY e.created_at DESC LIMIT 5`
+      );
+
+      // Stats de test cases (não de execuções)
+      const caseStats = await query(
+        `SELECT
+          COUNT(*)                                                    AS total,
+          SUM(CASE WHEN status = 'passed'  THEN 1 ELSE 0 END)        AS passed,
+          SUM(CASE WHEN status = 'failed'  THEN 1 ELSE 0 END)        AS failed,
+          SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END)        AS blocked,
+          SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END)        AS skipped,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END)        AS pending
+         FROM execution_results`
+      );
+      const cs = caseStats.rows[0];
 
       return {
         stats: {
-          totalProjects: parseInt(totalProjects.rows[0]?.count || 0),
-          totalTestCases: parseInt(totalTestCases.rows[0]?.count || 0),
-          totalExecutions: parseInt(totalExecutions.rows[0]?.count || 0)
+          totalProjects:   parseInt(totalProjects.rows[0]?.count   || 0),
+          totalExecutions: parseInt(totalExecutions.rows[0]?.count || 0),
+          testCases: {
+            total:   parseInt(cs.total)   || 0,
+            passed:  parseInt(cs.passed)  || 0,
+            failed:  parseInt(cs.failed)  || 0,
+            blocked: parseInt(cs.blocked) || 0,
+            skipped: parseInt(cs.skipped) || 0,
+            pending: parseInt(cs.pending) || 0,
+          }
         },
-        recentProjects: recentProjects.rows,
+        recentProjects:   recentProjects.rows,
         recentExecutions: recentExecutions.rows
       };
     } catch (err) {
       console.error(err);
       return {
-        stats: { totalProjects: 0, totalTestCases: 0, totalExecutions: 0 },
+        stats: {
+          totalProjects: 0, totalExecutions: 0,
+          testCases: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0, pending: 0 }
+        },
         recentProjects: [],
         recentExecutions: []
       };

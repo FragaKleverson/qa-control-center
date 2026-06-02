@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS execucoes (
   ambiente VARCHAR(255) DEFAULT 'staging',
   status VARCHAR(50) DEFAULT 'pending',
   resultado TEXT,
+  finalized BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

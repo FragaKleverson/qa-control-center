@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import GherkinDisplay from "../components/GherkinDisplay";
-import { projectsAPI, executionsAPI } from "../services/api";
+import { statsAPI } from "../services/api";
 import "./Dashboard.css";
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
-  const [testCases, setTestCases] = useState([]);
   const [executions, setExecutions] = useState([]);
+  const [statsData, setStatsData] = useState({
+    totalProjects: 0, totalExecutions: 0,
+    testCases: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0, pending: 0 }
+  });
   const [selectedItem, setSelectedItem] = useState(null);
   const [modalType, setModalType] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,28 +21,21 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
-  // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setToast({ message: "", type: "" });
-    }, 3000);
+    toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
   }
 
-  // Busca projetos e execuções em paralelo e alimenta os cards
   async function loadDashboard() {
     try {
-      const [projectsData, executionsData] = await Promise.all([
-        projectsAPI.list(),
-        executionsAPI.list()
-      ]);
-
-      setProjects(projectsData);
-      setTestCases(projectsData);
-      setExecutions(executionsData);
+      const dashData = await statsAPI.getDashboard();
+      setStatsData(dashData.stats || {
+        totalProjects: 0, totalExecutions: 0,
+        testCases: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0, pending: 0 }
+      });
+      setProjects(dashData.recentProjects || []);
+      setExecutions(dashData.recentExecutions || []);
     } catch (err) {
       console.error(err);
       showToast("Erro ao carregar dashboard", "error");
@@ -156,43 +152,40 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <div className="stats-grid">
-        <div 
-          className="stat-card projects"
-          onClick={() => projects.length > 0 && openModal("projects", projects[0])}
-          style={{ cursor: projects.length > 0 ? "pointer" : "default" }}
-        >
+        <div className="stat-card projects" style={{ cursor: "default" }}>
           <div className="stat-card-content">
             <div className="stat-card-label">📁 Total Projects</div>
-            <div className="stat-card-number">{projects.length}</div>
+            <div className="stat-card-number">{statsData.totalProjects}</div>
+            <div className="stat-card-description">{statsData.totalProjects === 1 ? "1 project" : `${statsData.totalProjects} projects`}</div>
+          </div>
+        </div>
+
+        <div className="stat-card executions" style={{ cursor: "default" }}>
+          <div className="stat-card-content">
+            <div className="stat-card-label">🚀 Executions</div>
+            <div className="stat-card-number">{statsData.totalExecutions}</div>
+            <div className="stat-card-description">{statsData.totalExecutions === 1 ? "1 execution" : `${statsData.totalExecutions} executions`}</div>
+          </div>
+        </div>
+
+        <div className="stat-card success-rate" style={{ cursor: "default" }}>
+          <div className="stat-card-content">
+            <div className="stat-card-label">✅ Test Cases Passed</div>
+            <div className="stat-card-number">{statsData.testCases?.passed ?? 0}</div>
             <div className="stat-card-description">
-              {projects.length === 1 ? "1 project created" : `${projects.length} projects created`}
+              {statsData.testCases?.total > 0
+                ? `${((statsData.testCases.passed / statsData.testCases.total) * 100).toFixed(1)}% success rate`
+                : "No test cases yet"}
             </div>
           </div>
         </div>
 
-        <div 
-          className="stat-card test-cases"
-          style={{ cursor: "default" }}
-        >
+        <div className="stat-card failed" style={{ cursor: "default" }}>
           <div className="stat-card-content">
-            <div className="stat-card-label">🧪 Total Test Cases</div>
-            <div className="stat-card-number">{testCases.length}</div>
+            <div className="stat-card-label">❌ Test Cases Failed</div>
+            <div className="stat-card-number">{statsData.testCases?.failed ?? 0}</div>
             <div className="stat-card-description">
-              {testCases.length === 1 ? "1 test case created" : `${testCases.length} test cases created`}
-            </div>
-          </div>
-        </div>
-
-        <div 
-          className="stat-card executions"
-          onClick={() => executions.length > 0 && openModal("executions", executions[0])}
-          style={{ cursor: executions.length > 0 ? "pointer" : "default" }}
-        >
-          <div className="stat-card-content">
-            <div className="stat-card-label">🚀 Total Executions</div>
-            <div className="stat-card-number">{executions.length}</div>
-            <div className="stat-card-description">
-              {executions.length === 1 ? "1 execution run" : `${executions.length} execution runs`}
+              {statsData.testCases?.failed === 0 ? "No failures — nice!" : `${statsData.testCases?.failed} need attention`}
             </div>
           </div>
         </div>
@@ -223,28 +216,35 @@ export default function Dashboard() {
         </div>
 
         <div className="dashboard-section">
-          <h2>🧪 Recent Test Cases</h2>
-          {testCases.length > 0 ? (
-            <div className="section-list">
-              {testCases.slice(0, 5).map((tc) => (
-                <div
-                  key={tc.id}
-                  className="list-item"
-                  onClick={() => openModal("testCases", tc)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <p className="list-item-title">{tc.titulo}</p>
-                  <p className="list-item-meta">
-                    {tc.cenarios && Array.isArray(tc.cenarios)
-                      ? `${tc.cenarios.length} cenário${tc.cenarios.length !== 1 ? "s" : ""}`
-                      : "0 cenários"}{" "}
-                    · {new Date(tc.created_at).toLocaleDateString()}
-                  </p>
+          <h2>📊 Execution Breakdown</h2>
+          {statsData.testCases?.total > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {[
+                { label: "Passed",  value: statsData.testCases.passed,  color: "#10b981", bg: "#dcfce7" },
+                { label: "Failed",  value: statsData.testCases.failed,  color: "#ef4444", bg: "#fee2e2" },
+                { label: "Blocked", value: statsData.testCases.blocked, color: "#a21caf", bg: "#fae8ff" },
+                { label: "Skipped", value: statsData.testCases.skipped, color: "#6b7280", bg: "#f3f4f6" },
+                { label: "Pending", value: statsData.testCases.pending, color: "#f59e0b", bg: "#fef3c7" },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px" }}>
+                    <span style={{ fontWeight: "600", color: item.color }}>{item.label}</span>
+                    <span style={{ color: "#6b7280" }}>{item.value} / {statsData.testCases.total}</span>
+                  </div>
+                  <div style={{ background: "#e5e7eb", borderRadius: "6px", height: "10px", overflow: "hidden" }}>
+                    <div style={{
+                      background: item.color,
+                      height: "100%",
+                      width: `${(item.value / statsData.testCases.total) * 100}%`,
+                      transition: "width 0.5s ease",
+                      borderRadius: "6px",
+                    }} />
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: "#9ca3af", fontSize: "14px" }}>No test cases yet. Create one to get started!</p>
+            <p style={{ color: "#9ca3af", fontSize: "14px" }}>No test cases executed yet.</p>
           )}
         </div>
 
