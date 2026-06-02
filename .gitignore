@@ -25,3 +25,8 @@ Thumbs.db
 
 # backend output
 DEBUG_BACKEND.docx
+
+# test coverage
+coverage/
+*.lcov
+test-results.txt

@@ -22,8 +22,10 @@ function getStatusInfo(status) {
 export default function Executions() {
   const [executions, setExecutions] = useState([]);
   const [suites, setSuites] = useState([]);
+  const [filterProject, setFilterProject] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [resultsMap, setResultsMap] = useState({});
+  const [obsMap, setObsMap] = useState({});
   const [loadingResults, setLoadingResults] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
@@ -79,6 +81,10 @@ export default function Executions() {
       try {
         const results = await executionsAPI.getResults(executionId);
         setResultsMap((prev) => ({ ...prev, [executionId]: results }));
+        // Inicializa rascunhos de observação
+        const obsInit = {};
+        results.forEach((r) => { obsInit[`${executionId}-${r.projeto_id}`] = r.comentario || ""; });
+        setObsMap((prev) => ({ ...prev, ...obsInit }));
       } catch (err) {
         console.error(err);
         showToast("Erro ao carregar test cases da execução", "error");
@@ -88,23 +94,54 @@ export default function Executions() {
     }
   }
 
-  // Atualiza o status de um test case dentro de uma execução e recarrega o status geral
+  // Salva a observação de um test case
+  async function handleUpdateResultComentario(execucaoId, projetoId, comentario, currentStatus) {
+    try {
+      const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: currentStatus, comentario });
+      if (res.error) throw new Error(res.error);
+      setResultsMap((prev) => ({
+        ...prev,
+        [execucaoId]: prev[execucaoId].map((r) =>
+          r.projeto_id === projetoId ? { ...r, comentario } : r
+        ),
+      }));
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "Erro ao salvar observação", "error");
+    }
+  }
+
+  // Atualiza o status de um test case dentro de uma execução
   async function handleUpdateResultStatus(execucaoId, projetoId, newStatus) {
     try {
-      await executionsAPI.updateResult(execucaoId, projetoId, { status: newStatus });
-      // Atualiza local
+      const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: newStatus });
+      if (res.error) throw new Error(res.error);
       setResultsMap((prev) => ({
         ...prev,
         [execucaoId]: prev[execucaoId].map((r) =>
           r.projeto_id === projetoId ? { ...r, status: newStatus } : r
         ),
       }));
-      // Reload executions para atualizar status geral
-      loadExecutions();
       showToast("Status atualizado!", "success");
     } catch (err) {
       console.error(err);
-      showToast("Erro ao atualizar status", "error");
+      showToast(err.message || "Erro ao atualizar status", "error");
+    }
+  }
+
+  // Finaliza a execução: calcula status final e bloqueia edição
+  async function handleFinalizeExecution(id) {
+    try {
+      const res = await executionsAPI.finalize(id);
+      if (res.error) throw new Error(res.error);
+      // Atualiza localmente o flag finalized e status
+      setExecutions((prev) =>
+        prev.map((e) => e.id === id ? { ...e, finalized: true, status: res.status } : e)
+      );
+      showToast("✅ Execução finalizada e salva! Não é possível editar os resultados.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "Erro ao finalizar execução", "error");
     }
   }
 
@@ -177,12 +214,29 @@ export default function Executions() {
         </div>
 
         <div className="card">
-          <h2>Execution History ({executions.length})</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <h2>Execution History ({executions.length})</h2>
+            {/* Filtro por projeto */}
+            {executions.some((e) => e.nome_projeto) && (
+              <select
+                value={filterProject}
+                onChange={(e) => setFilterProject(e.target.value)}
+                style={{ padding: "8px 12px", border: "1.5px solid #d1d5db", borderRadius: "7px", fontSize: "13px", background: "#fff", color: "#374151" }}
+              >
+                <option value="">All Projects</option>
+                {[...new Set(executions.filter((e) => e.nome_projeto).map((e) => e.nome_projeto))].map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            )}
+          </div>
           {executions.length === 0 ? (
             <p>No executions yet. Start by running a test suite!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
-              {executions.map((execution) => {
+              {executions
+                .filter((e) => !filterProject || e.nome_projeto === filterProject)
+                .map((execution) => {
                 const statusInfo = getStatusInfo(execution.status);
                 const isExpanded = expandedId === execution.id;
                 const results = resultsMap[execution.id] || [];
@@ -191,33 +245,75 @@ export default function Executions() {
                 return (
                   <div key={execution.id} style={{ background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb", overflow: "hidden" }}>
                     {/* Cabeçalho da execução */}
-                    <div style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                    <div style={{ padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px" }}>
                       <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: "0 0 6px 0", color: "#111827" }}>
-                          {execution.nome_suite || `Suite #${execution.suite_id}`}
-                        </h3>
-                        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
-                          <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "600" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                          <h3 style={{ margin: 0, color: "#111827" }}>
+                            {execution.nome_suite || `Suite #${execution.suite_id}`}
+                          </h3>
+                          <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: "3px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "700" }}>
                             {statusInfo.label}
                           </span>
-                          <span style={{ color: "#9ca3af", fontSize: "12px" }}>Ambiente: {execution.ambiente}</span>
-                          {execution.total_cases > 0 && (
-                            <span style={{ color: "#6b7280", fontSize: "12px" }}>
-                              {execution.passed_cases}/{execution.total_cases} passed · {execution.failed_cases} failed
+                          {execution.finalized && (
+                            <span style={{ background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", padding: "2px 8px", borderRadius: "5px", fontSize: "11px", fontWeight: "600" }}>
+                              🔒 Finalizada
                             </span>
                           )}
                         </div>
-                        <p style={{ margin: "0", color: "#9ca3af", fontSize: "12px" }}>
-                          {new Date(execution.created_at).toLocaleString()}
+                        {execution.nome_projeto && (
+                          <p style={{ margin: "0 0 6px 0", color: "#6366f1", fontSize: "12px", fontWeight: "600" }}>
+                            📁 {execution.nome_projeto}
+                          </p>
+                        )}
+                        <p style={{ margin: "0 0 8px 0", color: "#9ca3af", fontSize: "12px" }}>
+                          Ambiente: {execution.ambiente} · {new Date(execution.created_at).toLocaleString()}
                         </p>
+
+                        {/* Barra de status dos test cases */}
+                        {Number(execution.total_cases) > 0 && (() => {
+                          const total   = Number(execution.total_cases);
+                          const passed  = Number(execution.passed_cases);
+                          const failed  = Number(execution.failed_cases);
+                          const blocked = Number(execution.blocked_cases);
+                          const skipped = Number(execution.skipped_cases);
+                          const pending = Number(execution.pending_cases);
+                          return (
+                            <div>
+                              <div style={{ display: "flex", height: "8px", borderRadius: "6px", overflow: "hidden", background: "#e5e7eb", marginBottom: "6px" }}>
+                                {passed  > 0 && <div style={{ width: `${(passed /total)*100}%`,  background: "#10b981" }} />}
+                                {failed  > 0 && <div style={{ width: `${(failed /total)*100}%`,  background: "#ef4444" }} />}
+                                {blocked > 0 && <div style={{ width: `${(blocked/total)*100}%`,  background: "#a21caf" }} />}
+                                {skipped > 0 && <div style={{ width: `${(skipped/total)*100}%`,  background: "#9ca3af" }} />}
+                                {pending > 0 && <div style={{ width: `${(pending/total)*100}%`,  background: "#f59e0b" }} />}
+                              </div>
+                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", fontSize: "11px" }}>
+                                {passed  > 0 && <span style={{ color: "#15803d",  fontWeight: "600" }}>✅ {passed} passed</span>}
+                                {failed  > 0 && <span style={{ color: "#991b1b",  fontWeight: "600" }}>❌ {failed} failed</span>}
+                                {blocked > 0 && <span style={{ color: "#a21caf",  fontWeight: "600" }}>⛔ {blocked} blocked</span>}
+                                {skipped > 0 && <span style={{ color: "#6b7280",  fontWeight: "600" }}>⏭ {skipped} skipped</span>}
+                                {pending > 0 && <span style={{ color: "#92400e",  fontWeight: "600" }}>⏳ {pending} pending</span>}
+                                <span style={{ color: "#9ca3af" }}>/ {total} total</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+
+                      <div style={{ display: "flex", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         <button
                           onClick={() => toggleExpand(execution.id)}
                           style={{ background: "#6366f1", padding: "8px 14px", fontSize: "12px" }}
                         >
                           {isExpanded ? "Fechar" : "Ver Cases"}
                         </button>
+                        {!execution.finalized && (
+                          <button
+                            onClick={() => handleFinalizeExecution(execution.id)}
+                            style={{ background: "#10b981", padding: "8px 14px", fontSize: "12px", fontWeight: "700" }}
+                          >
+                            ✔ Finalizar
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteExecution(execution.id)}
                           style={{ background: "#ef4444", padding: "8px 14px", fontSize: "12px" }}
@@ -256,8 +352,19 @@ export default function Executions() {
                                         {result.titulo}
                                       </span>
                                     </div>
-                                    {result.comentario && (
-                                      <p style={{ margin: "0", color: "#6b7280", fontSize: "12px" }}>{result.comentario}</p>
+                                    {execution.finalized ? (
+                                      <p style={{ margin: "4px 0 0 0", color: "#6b7280", fontSize: "12px", fontStyle: "italic" }}>
+                                        {result.comentario || <span style={{ opacity: 0.5 }}>Sem observação</span>}
+                                      </p>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        placeholder="Observação (opcional)"
+                                        value={obsMap[`${execution.id}-${result.projeto_id}`] ?? ""}
+                                        onChange={(e) => setObsMap((prev) => ({ ...prev, [`${execution.id}-${result.projeto_id}`]: e.target.value }))}
+                                        onBlur={(e) => handleUpdateResultComentario(execution.id, result.projeto_id, e.target.value, result.status)}
+                                        style={{ marginTop: "6px", padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: "5px", fontSize: "12px", color: "#374151", width: "100%", background: "#fff", boxSizing: "border-box" }}
+                                      />
                                     )}
                                   </div>
                                   <div style={{ display: "flex", gap: "6px", flexShrink: 0, marginLeft: "12px" }}>
@@ -267,15 +374,21 @@ export default function Executions() {
                                     >
                                       Ver
                                     </button>
-                                    <select
-                                      value={result.status}
-                                      onChange={(e) => handleUpdateResultStatus(execution.id, result.projeto_id, e.target.value)}
-                                      style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e5e7eb", background: rs.bg, color: rs.color, cursor: "pointer", fontSize: "11px", fontWeight: "600" }}
-                                    >
-                                      {STATUS_OPTIONS.map((s) => (
-                                        <option key={s.value} value={s.value}>{s.label}</option>
-                                      ))}
-                                    </select>
+                                    {execution.finalized ? (
+                                      <span style={{ background: rs.bg, color: rs.color, padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", border: "1px solid #e5e7eb" }}>
+                                        {rs.label}
+                                      </span>
+                                    ) : (
+                                      <select
+                                        value={result.status}
+                                        onChange={(e) => handleUpdateResultStatus(execution.id, result.projeto_id, e.target.value)}
+                                        style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #e5e7eb", background: rs.bg, color: rs.color, cursor: "pointer", fontSize: "11px", fontWeight: "600" }}
+                                      >
+                                        {STATUS_OPTIONS.map((s) => (
+                                          <option key={s.value} value={s.value}>{s.label}</option>
+                                        ))}
+                                      </select>
+                                    )}
                                   </div>
                                 </div>
                               );

@@ -154,6 +154,10 @@ export const executionsAPI = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(r => r.json()),
+  finalize: (execucaoId) =>
+    apiFetch(`${API_BASE_URL}/execucoes/${execucaoId}/finalize`, {
+      method: "POST",
+    }).then(r => r.json()),
 };
 
 // ==================== RELATÓRIOS ====================
@@ -165,6 +169,13 @@ export const reportsAPI = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(filters),
     }).then(r => r.json()),
+  // Retorna o Response bruto para download do blob .docx
+  exportDocx: (filters) =>
+    apiFetch(`${API_BASE_URL}/relatorios/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(filters),
+    }),
 };
 
 // ==================== ESTATÍSTICAS GERAIS ====================

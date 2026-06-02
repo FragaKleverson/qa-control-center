@@ -13,6 +13,7 @@ export default function TestPlan() {
   const [planSuites, setPlanSuites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [execModal, setExecModal] = useState({ isOpen: false, plan: null, ambiente: "staging" });
   const [formData, setFormData] = useState({
     titulo: "", descricao: "", escopo: "", objetivo: "", ambiente: ""
   });
@@ -92,27 +93,25 @@ export default function TestPlan() {
     }
   }
 
-  // Abre dialog de confirmação e cria uma execução a partir de todas as suites do plan
-  function handleExecutePlan(plan, ambiente = "staging") {
-    setConfirmState({
-      isOpen: true,
-      message: `Executar o plan "${plan.titulo}" no ambiente ${ambiente}?`,
-      danger: false,
-      onConfirm: async () => {
-        setConfirmState((s) => ({ ...s, isOpen: false }));
-        setExecuting(true);
-        try {
-          const exec = await testPlansAPI.execute(plan.id, ambiente);
-          if (exec.error) throw new Error(exec.error);
-          showToast(`Execução #${exec.id} criada! Vá para Executions para acompanhar.`, "success");
-        } catch (err) {
-          console.error(err);
-          showToast("Erro ao executar plan: " + err.message, "error");
-        } finally {
-          setExecuting(false);
-        }
-      },
-    });
+  // Abre modal de escolha de ambiente para executar o plan
+  function handleExecutePlan(plan) {
+    setExecModal({ isOpen: true, plan, ambiente: plan.ambiente || "staging" });
+  }
+
+  async function confirmExecutePlan() {
+    const { plan, ambiente } = execModal;
+    setExecModal((s) => ({ ...s, isOpen: false }));
+    setExecuting(true);
+    try {
+      const exec = await testPlansAPI.execute(plan.id, ambiente);
+      if (exec.error) throw new Error(exec.error);
+      showToast(`Execução #${exec.id} criada! Vá para Executions para acompanhar.`, "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Erro ao executar plan: " + err.message, "error");
+    } finally {
+      setExecuting(false);
+    }
   }
 
   // Cria um novo test plan via API; valida campo título
@@ -202,7 +201,7 @@ export default function TestPlan() {
                         Manage Suites
                       </button>
                       <button
-                        onClick={() => handleExecutePlan(plan, plan.ambiente || "staging")}
+                        onClick={() => handleExecutePlan(plan)}
                         disabled={executing}
                         style={{ background: "#10b981", padding: "8px 16px", fontSize: "12px" }}
                       >
@@ -295,6 +294,50 @@ export default function TestPlan() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Executar plan — escolha de ambiente */}
+      <Modal
+        isOpen={execModal.isOpen}
+        title={`Executar "${execModal.plan?.titulo || ""}"`}
+        onClose={() => setExecModal((s) => ({ ...s, isOpen: false }))}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <p style={{ margin: 0, color: "#374151", fontSize: "14px" }}>
+            Escolha o ambiente onde este plan será executado:
+          </p>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: "600", color: "#374151" }}>
+            Ambiente
+            <select
+              value={execModal.ambiente}
+              onChange={(e) => setExecModal((s) => ({ ...s, ambiente: e.target.value }))}
+              style={{ padding: "9px 12px", border: "1.5px solid #d1d5db", borderRadius: "7px", fontSize: "14px", background: "#fff" }}
+            >
+              <option value="staging">Staging</option>
+              <option value="production">Production</option>
+              <option value="development">Development</option>
+              <option value="homologation">Homologação</option>
+              <option value="qa">QA</option>
+            </select>
+          </label>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={() => setExecModal((s) => ({ ...s, isOpen: false }))}
+              style={{ background: "#f3f4f6", color: "#374151", padding: "9px 20px", fontSize: "14px", boxShadow: "none", transform: "none" }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmExecutePlan}
+              disabled={executing}
+              style={{ background: "#10b981", padding: "9px 20px", fontSize: "14px" }}
+            >
+              {executing ? "Executando..." : "Confirmar"}
+            </button>
           </div>
         </div>
       </Modal>

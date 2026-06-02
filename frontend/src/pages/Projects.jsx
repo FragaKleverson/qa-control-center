@@ -7,12 +7,15 @@ import "./Pages.css";
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
     feature: ""
   });
+  const [editData, setEditData] = useState({ titulo: "", descricao: "", feature: "" });
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
@@ -73,6 +76,31 @@ export default function Projects() {
     } catch (err) {
       console.error(err);
       showToast("Erro ao criar projeto", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Abre o modal de edição com os dados do projeto selecionado
+  function openEdit(project) {
+    setEditingProject(project);
+    setEditData({ titulo: project.titulo, descricao: project.descricao, feature: project.feature });
+    setIsEditOpen(true);
+  }
+
+  // Salva as alterações do projeto via API
+  async function handleUpdateProject(e) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await projectsAPI.update(editingProject.id, editData);
+      showToast("Projeto atualizado!", "success");
+      setIsEditOpen(false);
+      setEditingProject(null);
+      loadProjects();
+    } catch (err) {
+      console.error(err);
+      showToast("Erro ao atualizar projeto", "error");
     } finally {
       setLoading(false);
     }
@@ -140,16 +168,20 @@ export default function Projects() {
                         Feature: {project.feature}
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleDeleteProject(project.id)}
-                      style={{
-                        background: "#ef4444",
-                        padding: "8px 16px",
-                        fontSize: "12px"
-                      }}
-                    >
-                      Delete
-                    </button>
+                    <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                      <button
+                        onClick={() => openEdit(project)}
+                        style={{ background: "#6366f1", padding: "8px 16px", fontSize: "12px" }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProject(project.id)}
+                        style={{ background: "#ef4444", padding: "8px 16px", fontSize: "12px" }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -158,6 +190,7 @@ export default function Projects() {
         </div>
       </div>
 
+      {/* Modal: Create */}
       <Modal
         isOpen={isModalOpen}
         title="Create New Project"
@@ -171,7 +204,6 @@ export default function Projects() {
             onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
             required
           />
-
           <textarea
             placeholder="Description"
             value={formData.descricao}
@@ -179,7 +211,6 @@ export default function Projects() {
             required
             style={{ minHeight: "80px", marginBottom: "16px" }}
           />
-
           <input
             type="text"
             placeholder="Feature"
@@ -187,14 +218,52 @@ export default function Projects() {
             onChange={(e) => setFormData({ ...formData, feature: e.target.value })}
             required
           />
-
           <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
             <button type="submit" disabled={loading}>
               {loading ? "Creating..." : "Create Project"}
             </button>
+            <button type="button" onClick={() => setIsModalOpen(false)} style={{ background: "#6b7280" }}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Edit */}
+      <Modal
+        isOpen={isEditOpen}
+        title="Edit Project"
+        onClose={() => { setIsEditOpen(false); setEditingProject(null); }}
+      >
+        <form onSubmit={handleUpdateProject}>
+          <input
+            type="text"
+            placeholder="Project Title"
+            value={editData.titulo}
+            onChange={(e) => setEditData({ ...editData, titulo: e.target.value })}
+            required
+          />
+          <textarea
+            placeholder="Description"
+            value={editData.descricao}
+            onChange={(e) => setEditData({ ...editData, descricao: e.target.value })}
+            required
+            style={{ minHeight: "80px", marginBottom: "16px" }}
+          />
+          <input
+            type="text"
+            placeholder="Feature"
+            value={editData.feature}
+            onChange={(e) => setEditData({ ...editData, feature: e.target.value })}
+            required
+          />
+          <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+            <button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => { setIsEditOpen(false); setEditingProject(null); }}
               style={{ background: "#6b7280" }}
             >
               Cancel

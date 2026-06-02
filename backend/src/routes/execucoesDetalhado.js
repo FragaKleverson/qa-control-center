@@ -94,4 +94,15 @@ router.put("/:id/results/:projetoId", async (req, res) => {
   }
 });
 
+// POST - Finalizar execução (calcula status final e bloqueia edição)
+router.post("/:id/finalize", async (req, res) => {
+  try {
+    const execution = await executionsService.finalize(req.params.id);
+    res.json(execution);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

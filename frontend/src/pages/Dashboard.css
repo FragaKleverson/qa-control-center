@@ -71,6 +71,14 @@
   background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }
 
+.stat-card.success-rate {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.stat-card.failed {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
 .stat-card-content {
   position: relative;
   z-index: 1;
