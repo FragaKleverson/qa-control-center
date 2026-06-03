@@ -266,5 +266,3 @@ Importe `QA_Control_Center_API.postman_collection.json`. A collection já tem:
 - CORS restrito às origens em `ALLOWED_ORIGINS`
 - Rate limiting configurável (`RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`)
 - Porta do banco não exposta em produção (remova `DB_PORT_EXPOSED` do `.env`)
-
----
