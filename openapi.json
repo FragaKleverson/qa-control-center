@@ -1,0 +1,257 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "QA Control Center API",
+    "description": "API para gerenciar projetos, testes, execuções e relatórios de QA.\n\n## 🔐 COMO USAR A AUTENTICAÇÃO\n\n### Passo 1: Fazer Login\n1. Abra o endpoint `POST /auth/login`\n2. Execute com:\n   - email: usuario@empresa.com\n   - password: sua_senha\n\n### Passo 2: Copiar Token\n1. Na resposta, copie o valor do campo `token`\n2. NÃO inclua \"Bearer\", apenas o token\n\n### Passo 3: Autorizar no Swagger\n1. Clique no botão verde \"Authorize\" (topo direito)\n2. Cole o token no campo de entrada\n3. Clique em \"Authorize\"\n\n### Passo 4: Usar em Requisições\n- Agora todos endpoints protegidos usarão o token automaticamente\n- O token é persistente até fazer refresh ou logout\n\n## 📝 Endpoints Públicos (sem token)\n- `POST /auth/login`\n- `POST /auth/register`\n\n## 🔒 Endpoints Protegidos (requerem JWT)\n- Todos os outros (Projetos, Suites, Testes, etc)",
+    "version": "1.0.0",
+    "contact": {
+      "name": "QA Team",
+      "url": "http://github.com/FragaKleverson/qa-control-center"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Desenvolvimento"
+    },
+    {
+      "url": "https://api.qa-control.com",
+      "description": "Produção"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "✅ Cole o token recebido do login aqui. Clique em Authorize para usar em todas requisições."
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Projeto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "nome": { "type": "string" },
+          "descricao": { "type": "string" },
+          "status": { "type": "string" },
+          "criado_em": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "🔑 Fazer Login (COMECE AQUI)",
+        "description": "Execute este endpoint primeiro! Copie o token da resposta e clique em 'Authorize' no topo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "usuario@empresa.com" },
+                  "password": { "type": "string", "example": "senha123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "✅ Login bem-sucedido! COPIE O TOKEN E CLIQUE EM AUTHORIZE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "👈 COPIE ESTE VALOR"
+                    },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email ou senha inválidos"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Registrar novo usuário",
+        "parameters": [
+          {
+            "name": "x-register-token",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Token de registro do .env (REGISTER_TOKEN)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome": { "type": "string", "example": "João Silva" },
+                  "email": { "type": "string", "example": "joao@empresa.com" },
+                  "password": { "type": "string", "example": "SenhaForte@123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuário criado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "403": {
+            "description": "Token de registro inválido"
+          }
+        }
+      }
+    },
+    "/projetos": {
+      "get": {
+        "tags": ["Projetos"],
+        "summary": "Listar todos os projetos",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Lista de projetos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Projeto" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "❌ Sem token! Faça login primeiro."
+          }
+        }
+      },
+      "post": {
+        "tags": ["Projetos"],
+        "summary": "Criar novo projeto",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome": { "type": "string", "example": "Novo Projeto" },
+                  "descricao": { "type": "string", "example": "Descrição" },
+                  "status": { "type": "string", "example": "ativo" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Projeto criado"
+          }
+        }
+      }
+    },
+    "/projetos/{id}": {
+      "get": {
+        "tags": ["Projetos"],
+        "summary": "Obter projeto por ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Projeto encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Projeto" }
+              }
+            }
+          },
+          "404": {
+            "description": "Projeto não encontrado"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Projetos"],
+        "summary": "Atualizar projeto",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Projeto atualizado" }
+        }
+      },
+      "delete": {
+        "tags": ["Projetos"],
+        "summary": "Deletar projeto",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Projeto deletado" }
+        }
+      }
+    }
+  }
+}

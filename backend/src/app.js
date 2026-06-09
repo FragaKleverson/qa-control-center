@@ -5,6 +5,8 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const hpp = require("hpp");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swagger");
 const projetosRoutes = require("./routes/projetos");
 const testSuitesRoutes = require("./routes/testSuites");
 const requirementsRoutes = require("./routes/requirements");
@@ -17,6 +19,45 @@ const authMiddleware = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
+
+/* =========================
+   SWAGGER DOCUMENTATION
+   Documentação interativa em http://localhost:3001/api-docs
+========================= */
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: `
+      .swagger-ui {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .topbar {
+        background-color: #1e1e1e;
+      }
+      .swagger-ui .topbar .download-url-wrapper input {
+        max-width: 100%;
+      }
+    `,
+    customSiteTitle: "QA Control Center - API Docs",
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayOperationId: true,
+      docExpansion: "list",
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 1,
+    },
+    customfavIcon: "https://swagger.io/favicon-32x32.png",
+  })
+);
+
+/* =========================
+   SWAGGER JSON ENDPOINT
+   Para ferramentas externas (Postman, Insomnia, etc)
+========================= */
+app.get("/openapi.json", (req, res) => {
+  res.json(swaggerSpec);
+});
 
 /* =========================
    SEGURANÇA — HTTP HEADERS

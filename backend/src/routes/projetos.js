@@ -2,6 +2,34 @@ const express = require("express");
 const router = express.Router();
 const { projectsService } = require("../services");
 
+/**
+ * @swagger
+ * /projetos:
+ *   get:
+ *     summary: Listar todos os projetos
+ *     tags:
+ *       - Projetos
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de projetos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   nome:
+ *                     type: string
+ *                   descricao:
+ *                     type: string
+ *       401:
+ *         description: Sem token de autenticação
+ */
 // GET - Listar todos os projetos
 router.get("/", async (req, res, next) => {
   try {
@@ -12,6 +40,27 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /projetos/{id}:
+ *   get:
+ *     summary: Obter projeto por ID
+ *     tags:
+ *       - Projetos
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Projeto encontrado
+ *       404:
+ *         description: Projeto não encontrado
+ */
 // GET - Obter projeto por ID
 router.get("/:id", async (req, res, next) => {
   try {
@@ -23,6 +72,32 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /projetos:
+ *   post:
+ *     summary: Criar novo projeto
+ *     tags:
+ *       - Projetos
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nome:
+ *                 type: string
+ *               descricao:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Projeto criado
+ */
 // POST - Criar novo projeto
 router.post("/", async (req, res) => {
   try {
@@ -34,6 +109,31 @@ router.post("/", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /projetos/{id}:
+ *   put:
+ *     summary: Atualizar projeto
+ *     tags:
+ *       - Projetos
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Projeto atualizado
+ */
 // PUT - Atualizar projeto
 router.put("/:id", async (req, res) => {
   try {
@@ -45,6 +145,25 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /projetos/{id}:
+ *   delete:
+ *     summary: Deletar projeto
+ *     tags:
+ *       - Projetos
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Projeto deletado
+ */
 // DELETE - Deletar projeto
 router.delete("/:id", async (req, res) => {
   try {
