@@ -28,20 +28,42 @@ http://localhost:3001/api-docs
 
 ## 🔐 Como Autenticar no Swagger UI
 
-### Passo 1: Fazer Login
+### ⚠️ Primeira Vez? REGISTER_TOKEN
+
+1. Copie valor de **REGISTER_TOKEN** do seu `.env`
+2. Vá para o endpoint **`POST /auth/register`**
+3. No header `x-register-token`, cole o token
+
+### Passo 1️⃣: Registrar Usuário
+
+1. Clique em **`POST /auth/register`** (seção Autenticação)
+2. Clique em **"Try it out"**
+3. No **header** `x-register-token`, cole seu `REGISTER_TOKEN`
+4. No **body**, preencha:
+   ```json
+   {
+     "nome": "Seu Nome",
+     "email": "seu@email.com",
+     "password": "SenhaForte@123"
+   }
+   ```
+5. Clique em **"Execute"**
+6. ✅ Usuário criado!
+
+### Passo 2️⃣: Fazer Login
 
 1. Clique em **`POST /auth/login`** (seção Autenticação)
 2. Clique em **"Try it out"**
-3. Cole dados de teste:
+3. Preencha com email/password que acabou de registrar:
    ```json
    {
-     "email": "usuario@empresa.com",
+     "email": "seu@email.com",
      "password": "SenhaForte@123"
    }
    ```
 4. Clique em **"Execute"**
 
-### Passo 2: Copiar Token
+### Passo 3️⃣: Copiar JWT
 
 Na resposta, você verá:
 ```json
@@ -53,50 +75,86 @@ Na resposta, você verá:
 
 ✅ **Copie o valor do campo `token`** (sem as aspas)
 
-### Passo 3: Autorizar
+### Passo 4️⃣: Autorizar no Swagger
 
 1. Clique no botão verde **"Authorize"** (topo direito)
-2. Cole o token
+2. Cole apenas o **token JWT** (sem "Bearer")
 3. Clique em **"Authorize"**
 4. Clique em **"Close"**
 
-### Passo 4: Usar Endpoints
+### Passo 5️⃣: Usar Endpoints Protegidos
 
 Agora teste qualquer endpoint (ex: `GET /projetos`):
 - Clique em **"Try it out"**
 - Clique em **"Execute"**
 
-O token é enviado **automaticamente**! ✨
+O JWT é enviado **automaticamente**! ✨
 
 ---
 
 ## 📦 Usar em Postman / Insomnia
 
-### OpenAPI JSON (Recomendado)
+### ✨ Nova Collection Postman (Automática!)
 
-**Importante:** `openapi.json` **substitui** a collection Postman.
+Temos uma **Collection pronta com automação**:
 
-**Por que?**
-- ✅ 1 arquivo para todas ferramentas
-- ✅ Sempre sincronizado
-- ✅ Suporta Postman, Insomnia, VSCode, etc.
+📄 **Arquivo:** `QA_Control_Center.postman_collection.json`
 
-### Importar em Postman
+**O que tem de bom:**
+- ✅ Todos endpoints pré-configurados
+- ✅ Login **extrai JWT automaticamente**
+- ✅ Todos endpoints protegidos usam JWT **automaticamente**
+- ✅ Variáveis compartilhadas (baseUrl, jwt_token, register_token)
+- ✅ Pronto para usar!
 
+### Como Usar
+
+1. **Importe a Collection:**
+   - Abra **Postman** → **Import**
+   - Selecione `QA_Control_Center.postman_collection.json`
+   - ✅ Collection criada!
+
+2. **Configure REGISTER_TOKEN:**
+   - Clique em **Variables** (abas do topo)
+   - Localize `register_token`
+   - Na coluna **Current value**, cole seu `REGISTER_TOKEN` do `.env`
+
+3. **Registre usuário:**
+   - Vá em **Auth → 1️⃣ Register User**
+   - Clique em **Send**
+   - ✅ Usuário criado!
+
+4. **Faça Login:**
+   - Vá em **Auth → 2️⃣ Login**
+   - Clique em **Send**
+   - JWT é salvo **automaticamente** em `{{jwt_token}}`
+   - ✅ Pronto!
+
+5. **Teste endpoints:**
+   - Clique em **Projetos → Listar Projetos**
+   - Clique em **Send**
+   - JWT é injetado **automaticamente**
+
+### Automação do Login
+
+O script Tests do Login faz tudo:
+
+```javascript
+const response = pm.response.json();
+
+if (response.token) {
+    pm.collectionVariables.set('jwt_token', response.token);
+    console.log('✅ JWT salvo em {{jwt_token}}');
+}
 ```
-1. Postman → Import
-2. Arraste openapi.json
-3. Collection criada automaticamente!
-4. Teste como no Swagger UI
-```
 
-### Importar em Insomnia
+Agora é só clicar em **Send** e aproveitar! 🚀
 
-```
-1. Insomnia → Create → Import
-2. Selecione openapi.json
-3. Pronto!
-```
+### OpenAPI JSON (Alternativa)
+
+Se preferir Insomnia/ThunderClient:
+- Importe `openapi.json` na ferramenta
+- Mesma funcionalidade
 
 ---
 
