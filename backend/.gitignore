@@ -1,0 +1,7 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+# Prisma generated client (não commitar o cliente gerado)
+/prisma/client
+# Nota: prisma/schema.prisma e prisma/migrations/ DEVEM estar no git

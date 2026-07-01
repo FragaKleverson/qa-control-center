@@ -1,0 +1,158 @@
+// Prisma schema — QA Control Center
+// URL configurada no prisma.config.ts via DATABASE_URL
+// Migrations em: prisma/migrations/
+// Queries usam pg (pool) diretamente; Prisma gerencia apenas o schema/migrations.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// PROJETOS (test cases)
+// =============================================================================
+model Projeto {
+  id         Int      @id @default(autoincrement())
+  titulo     String
+  descricao  String?
+  feature    String?
+  cenarios   Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  test_suites       TestSuite[]
+  test_suite_cases  TestSuiteCase[]
+  execution_results ExecutionResult[]
+
+  @@map("projetos")
+}
+
+// =============================================================================
+// TEST SUITES
+// =============================================================================
+model TestSuite {
+  id         Int      @id @default(autoincrement())
+  nome       String
+  descricao  String?  @default("")
+  projeto_id Int?
+  projeto    Projeto? @relation(fields: [projeto_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  execucoes        Execucao[]
+  test_suite_cases TestSuiteCase[]
+  test_plan_suites TestPlanSuite[]
+
+  @@map("test_suites")
+}
+
+// =============================================================================
+// REQUIREMENTS
+// =============================================================================
+model Requirement {
+  id         Int      @id @default(autoincrement())
+  titulo     String
+  descricao  String?  @default("")
+  status     String   @default("Open")
+  prioridade String   @default("Medium")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@map("requirements")
+}
+
+// =============================================================================
+// TEST PLANS
+// =============================================================================
+model TestPlan {
+  id         Int      @id @default(autoincrement())
+  titulo     String
+  descricao  String?  @default("")
+  escopo     String?  @default("")
+  objetivo   String?  @default("")
+  ambiente   String?  @default("")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  test_plan_suites TestPlanSuite[]
+
+  @@map("test_plans")
+}
+
+// =============================================================================
+// EXECUÇÕES
+// =============================================================================
+model Execucao {
+  id         Int       @id @default(autoincrement())
+  suite_id   Int?
+  suite      TestSuite? @relation(fields: [suite_id], references: [id], onDelete: Cascade)
+  ambiente   String    @default("staging")
+  status     String    @default("pending")
+  resultado  String?
+  finalized  Boolean   @default(false)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+
+  execution_results ExecutionResult[]
+
+  @@map("execucoes")
+}
+
+// =============================================================================
+// RELACIONAMENTOS
+// =============================================================================
+model TestSuiteCase {
+  id         Int       @id @default(autoincrement())
+  suite_id   Int
+  suite      TestSuite @relation(fields: [suite_id], references: [id], onDelete: Cascade)
+  projeto_id Int
+  projeto    Projeto   @relation(fields: [projeto_id], references: [id], onDelete: Cascade)
+  created_at DateTime  @default(now())
+
+  @@unique([suite_id, projeto_id])
+  @@map("test_suite_cases")
+}
+
+model TestPlanSuite {
+  id         Int      @id @default(autoincrement())
+  plan_id    Int
+  plan       TestPlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  suite_id   Int
+  suite      TestSuite @relation(fields: [suite_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@unique([plan_id, suite_id])
+  @@map("test_plan_suites")
+}
+
+model ExecutionResult {
+  id          Int      @id @default(autoincrement())
+  execucao_id Int
+  execucao    Execucao @relation(fields: [execucao_id], references: [id], onDelete: Cascade)
+  projeto_id  Int
+  projeto     Projeto  @relation(fields: [projeto_id], references: [id], onDelete: Cascade)
+  status      String   @default("pending")
+  comentario  String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@unique([execucao_id, projeto_id])
+  @@map("execution_results")
+}
+
+// =============================================================================
+// USUÁRIOS
+// =============================================================================
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  @@map("users")
+}
