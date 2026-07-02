@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { projectsService } = require("../services");
+const { validate } = require("../middleware/validate");
+const { idParamSchema } = require("../validators/common");
+const { createSchema, updateSchema } = require("../validators/projetos");
 
 /**
  * @swagger
@@ -62,7 +65,7 @@ router.get("/", async (req, res, next) => {
  *         description: Projeto não encontrado
  */
 // GET - Obter projeto por ID
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const projeto = await projectsService.getById(req.params.id);
     if (!projeto) return res.status(404).json({ error: "Projeto não encontrado" });
@@ -99,7 +102,7 @@ router.get("/:id", async (req, res, next) => {
  *         description: Projeto criado
  */
 // POST - Criar novo projeto
-router.post("/", async (req, res) => {
+router.post("/", validate(createSchema), async (req, res) => {
   try {
     const projeto = await projectsService.create(req.body);
     res.status(201).json(projeto);
@@ -135,7 +138,7 @@ router.post("/", async (req, res) => {
  *         description: Projeto atualizado
  */
 // PUT - Atualizar projeto
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
   try {
     const projeto = await projectsService.update(req.params.id, req.body);
     res.json(projeto);
@@ -165,7 +168,7 @@ router.put("/:id", async (req, res) => {
  *         description: Projeto deletado
  */
 // DELETE - Deletar projeto
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
   try {
     await projectsService.delete(req.params.id);
     res.json({ message: "Projeto deletado com sucesso" });

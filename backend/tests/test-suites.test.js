@@ -73,11 +73,11 @@ describe("Test Suites API - Suite completa", () => {
             expect(res.body.nome).toBe("Nova Suite");
         });
 
-        it("deve retornar 400 sem nome", async () => {
+        it("deve retornar 422 sem nome", async () => {
             const res = await request(app)
                 .post("/test-suites")
                 .send({ descricao: "sem nome" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         it("deve aceitar criação sem descricao", async () => {

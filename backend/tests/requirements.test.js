@@ -88,18 +88,18 @@ describe("Requirements API - Suite completa", () => {
             expect(res.body.prioridade).toBe("Medium");
         });
 
-        it("deve retornar 400 sem titulo", async () => {
+        it("deve retornar 422 sem titulo", async () => {
             const res = await request(app)
                 .post("/requirements")
                 .send({ descricao: "sem titulo", status: "Open" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve retornar 400 para titulo só com espaços", async () => {
+        it("deve retornar 422 para titulo só com espaços", async () => {
             const res = await request(app)
                 .post("/requirements")
                 .send({ ...PAYLOAD_VALIDO, titulo: "   " });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         it("deve aceitar todos os valores válidos de status", async () => {

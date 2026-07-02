@@ -116,11 +116,11 @@ describe("Execuções API - Suite completa", () => {
             expect(res.body.status).toBe("pending");
         });
 
-        it("deve retornar 400 sem suite_id", async () => {
+        it("deve retornar 422 sem suite_id", async () => {
             const res = await request(app)
                 .post("/execucoes")
                 .send({ ambiente: "staging" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
     });
@@ -197,7 +197,7 @@ describe("Execuções API - Suite completa", () => {
             expect(res.body.status).toBe("passed");
         });
 
-        it("deve retornar 400 ao atualizar resultado sem status", async () => {
+        it("deve retornar 422 ao atualizar resultado sem status", async () => {
             const suite = await createSuite();
             const projeto = await createProjeto();
             const exec = await createExecucao(suite.id);
@@ -210,7 +210,7 @@ describe("Execuções API - Suite completa", () => {
             const res = await request(app)
                 .put(`/execucoes/${exec.id}/results/${projeto.id}`)
                 .send({});
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
     });
