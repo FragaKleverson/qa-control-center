@@ -1,5 +1,6 @@
 // Database Configuration
 const pool = require("../db");
+const AppError = require("../middleware/AppError");
 
 // Helper function para executar queries
 const query = (sql, params) => pool.query(sql, params);
@@ -34,13 +35,13 @@ const projectsService = {
       "UPDATE projetos SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), feature = COALESCE($3, feature), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *",
       [titulo || null, descricao || null, feature || null, id]
     );
-    if (result.rows.length === 0) throw new Error("Projeto não encontrado");
+    if (result.rows.length === 0) throw new AppError("Projeto não encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
     const result = await query("DELETE FROM projetos WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new Error("Projeto não encontrado");
+    if (result.rows.length === 0) throw new AppError("Projeto não encontrado", 404);
     return result.rows[0];
   }
 };
@@ -73,13 +74,13 @@ const testSuitesService = {
       "UPDATE test_suites SET nome = COALESCE($1, nome), descricao = COALESCE($2, descricao), projeto_id = COALESCE($3, projeto_id), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *",
       [nome || null, descricao || null, projeto_id || null, id]
     );
-    if (result.rows.length === 0) throw new Error("Suite não encontrada");
+    if (result.rows.length === 0) throw new AppError("Suite não encontrada", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
     const result = await query("DELETE FROM test_suites WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new Error("Suite não encontrada");
+    if (result.rows.length === 0) throw new AppError("Suite não encontrada", 404);
     return result.rows[0];
   },
 
@@ -142,13 +143,13 @@ const requirementsService = {
       "UPDATE requirements SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), status = COALESCE($3, status), prioridade = COALESCE($4, prioridade), updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *",
       [titulo || null, descricao || null, status || null, prioridade || null, id]
     );
-    if (result.rows.length === 0) throw new Error("Requirement não encontrado");
+    if (result.rows.length === 0) throw new AppError("Requirement não encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
     const result = await query("DELETE FROM requirements WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new Error("Requirement não encontrado");
+    if (result.rows.length === 0) throw new AppError("Requirement não encontrado", 404);
     return result.rows[0];
   }
 };
@@ -181,13 +182,13 @@ const testPlansService = {
       "UPDATE test_plans SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), escopo = COALESCE($3, escopo), objetivo = COALESCE($4, objetivo), ambiente = COALESCE($5, ambiente), updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *",
       [titulo || null, descricao || null, escopo || null, objetivo || null, ambiente || null, id]
     );
-    if (result.rows.length === 0) throw new Error("Test Plan não encontrado");
+    if (result.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
     const result = await query("DELETE FROM test_plans WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new Error("Test Plan não encontrado");
+    if (result.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
     return result.rows[0];
   },
 
@@ -226,7 +227,7 @@ const testPlansService = {
   // Cria execução a partir de um plan (popula execution_results com todos os test cases)
   execute: async (planId, ambiente = "staging") => {
     const plan = await query("SELECT * FROM test_plans WHERE id = $1", [planId]);
-    if (plan.rows.length === 0) throw new Error("Test Plan não encontrado");
+    if (plan.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
 
     // Buscar a primeira suite do plan para usar como suite_id na execução
     const suitesResult = await query(
@@ -306,13 +307,13 @@ const executionsService = {
       "UPDATE execucoes SET status = COALESCE($1, status), resultado = COALESCE($2, resultado), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
       [status || null, resultado || null, id]
     );
-    if (result.rows.length === 0) throw new Error("Execução não encontrada");
+    if (result.rows.length === 0) throw new AppError("Execução não encontrada", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
     const result = await query("DELETE FROM execucoes WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new Error("Execução não encontrada");
+    if (result.rows.length === 0) throw new AppError("Execução não encontrada", 404);
     return result.rows[0];
   },
 
@@ -333,7 +334,7 @@ const executionsService = {
   updateResult: async (execucaoId, projetoId, status, comentario) => {
     // Bloqueia edição se a execução já foi finalizada
     const execCheck = await query("SELECT finalized FROM execucoes WHERE id = $1", [execucaoId]);
-    if (execCheck.rows[0]?.finalized) throw new Error("Execução finalizada — não é possível editar os resultados.");
+    if (execCheck.rows[0]?.finalized) throw new AppError("Execução finalizada — não é possível editar os resultados.", 422);
 
     const result = await query(
       `UPDATE execution_results
@@ -342,7 +343,7 @@ const executionsService = {
        RETURNING *`,
       [status, comentario || null, execucaoId, projetoId]
     );
-    if (result.rows.length === 0) throw new Error("Resultado não encontrado");
+    if (result.rows.length === 0) throw new AppError("Resultado não encontrado", 404);
 
     // Marca execução como 'running' enquanto há casos pendentes
     await query(
@@ -356,8 +357,8 @@ const executionsService = {
   // Finaliza a execução: calcula o status final com base nos resultados e bloqueia edição
   finalize: async (execucaoId) => {
     const execCheck = await query("SELECT finalized FROM execucoes WHERE id = $1", [execucaoId]);
-    if (!execCheck.rows[0]) throw new Error("Execução não encontrada");
-    if (execCheck.rows[0].finalized) throw new Error("Execução já foi finalizada.");
+    if (!execCheck.rows[0]) throw new AppError("Execução não encontrada", 404);
+    if (execCheck.rows[0].finalized) throw new AppError("Execução já foi finalizada.", 422);
 
     // Calcular status final: se algum falhou → 'failed'; se todos passaram → 'passed'; caso contrário → 'completed'
     const counts = await query(

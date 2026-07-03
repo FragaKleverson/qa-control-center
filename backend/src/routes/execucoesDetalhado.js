@@ -37,35 +37,32 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 });
 
 // POST - Criar nova execução
-router.post("/", validate(createSchema), async (req, res) => {
+router.post("/", validate(createSchema), async (req, res, next) => {
   try {
     const execution = await executionsService.create(req.body);
     res.status(201).json(execution);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT - Atualizar execução
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const execution = await executionsService.update(req.params.id, req.body);
     res.json(execution);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE - Deletar execução
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await executionsService.delete(req.params.id);
     res.json({ message: "Execução deletada com sucesso" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -80,7 +77,7 @@ router.get("/:id/results", validate(idParamSchema, "params"), async (req, res, n
 });
 
 // PUT - Atualizar status de um test case em uma execução
-router.put("/:id/results/:projetoId", validate(idAndProjetoIdSchema, "params"), validate(updateResultSchema), async (req, res) => {
+router.put("/:id/results/:projetoId", validate(idAndProjetoIdSchema, "params"), validate(updateResultSchema), async (req, res, next) => {
   try {
     const { status, comentario } = req.body;
     const result = await executionsService.updateResult(
@@ -91,19 +88,17 @@ router.put("/:id/results/:projetoId", validate(idAndProjetoIdSchema, "params"), 
     );
     res.json(result);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST - Finalizar execução (calcula status final e bloqueia edição)
-router.post("/:id/finalize", validate(idParamSchema, "params"), async (req, res) => {
+router.post("/:id/finalize", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const execution = await executionsService.finalize(req.params.id);
     res.json(execution);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

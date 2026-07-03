@@ -14,18 +14,17 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST - Gerar relatório com filtros (JSON)
-router.post("/generate", async (req, res) => {
+router.post("/generate", async (req, res, next) => {
   try {
     const report = await reportsService.generateReport(req.body);
     res.json(report);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST - Exportar relatório como .docx
-router.post("/export", async (req, res) => {
+router.post("/export", async (req, res, next) => {
   try {
     const report = await reportsService.generateReport(req.body);
     const { summary, executions } = report;
@@ -127,8 +126,7 @@ router.post("/export", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(buffer);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

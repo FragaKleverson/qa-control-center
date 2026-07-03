@@ -27,35 +27,32 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 });
 
 // POST - Criar novo requirement
-router.post("/", validate(createSchema), async (req, res) => {
+router.post("/", validate(createSchema), async (req, res, next) => {
   try {
     const requirement = await requirementsService.create(req.body);
     res.status(201).json(requirement);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT - Atualizar requirement
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const requirement = await requirementsService.update(req.params.id, req.body);
     res.json(requirement);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE - Deletar requirement
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await requirementsService.delete(req.params.id);
     res.json({ message: "Requirement deletado com sucesso" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

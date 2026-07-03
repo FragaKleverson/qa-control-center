@@ -102,13 +102,12 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
  *         description: Projeto criado
  */
 // POST - Criar novo projeto
-router.post("/", validate(createSchema), async (req, res) => {
+router.post("/", validate(createSchema), async (req, res, next) => {
   try {
     const projeto = await projectsService.create(req.body);
     res.status(201).json(projeto);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -138,13 +137,12 @@ router.post("/", validate(createSchema), async (req, res) => {
  *         description: Projeto atualizado
  */
 // PUT - Atualizar projeto
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const projeto = await projectsService.update(req.params.id, req.body);
     res.json(projeto);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -168,13 +166,12 @@ router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), as
  *         description: Projeto deletado
  */
 // DELETE - Deletar projeto
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await projectsService.delete(req.params.id);
     res.json({ message: "Projeto deletado com sucesso" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 

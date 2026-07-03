@@ -27,35 +27,32 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 });
 
 // POST - Criar novo test suite
-router.post("/", validate(createSchema), async (req, res) => {
+router.post("/", validate(createSchema), async (req, res, next) => {
   try {
     const suite = await testSuitesService.create(req.body);
     res.status(201).json(suite);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT - Atualizar test suite
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const suite = await testSuitesService.update(req.params.id, req.body);
     res.json(suite);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE - Deletar test suite
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await testSuitesService.delete(req.params.id);
     res.json({ message: "Test suite deletada com sucesso" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -70,24 +67,22 @@ router.get("/:id/cases", validate(idParamSchema, "params"), async (req, res, nex
 });
 
 // POST - Vincular test case a uma suite
-router.post("/:id/cases", validate(idParamSchema, "params"), validate(addCaseSchema), async (req, res) => {
+router.post("/:id/cases", validate(idParamSchema, "params"), validate(addCaseSchema), async (req, res, next) => {
   try {
     const result = await testSuitesService.addCase(req.params.id, req.body.projeto_id);
     res.status(201).json(result);
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE - Desvincular test case de uma suite
-router.delete("/:id/cases/:projetoId", validate(idAndProjetoIdSchema, "params"), async (req, res) => {
+router.delete("/:id/cases/:projetoId", validate(idAndProjetoIdSchema, "params"), async (req, res, next) => {
   try {
     await testSuitesService.removeCase(req.params.id, req.params.projetoId);
     res.json({ message: "Test case removido da suite" });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
+    next(err);
   }
 });
 
