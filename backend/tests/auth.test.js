@@ -67,7 +67,7 @@ describe("POST /auth/register", () => {
       .set("x-register-token", process.env.REGISTER_TOKEN)
       .send({ name: "Sem Email" });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
   });
 
   it("deve rejeitar password com menos de 8 caracteres", async () => {
@@ -76,7 +76,7 @@ describe("POST /auth/register", () => {
       .set("x-register-token", process.env.REGISTER_TOKEN)
       .send({ name: "Curto", email: "curto@qa.dev", password: "abc" });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
   });
 
   it("deve rejeitar email duplicado", async () => {
@@ -128,12 +128,12 @@ describe("POST /auth/login", () => {
     expect(res.body.error).toBe("Credenciais inválidas");
   });
 
-  it("deve rejeitar campos ausentes com 400", async () => {
+  it("deve rejeitar campos ausentes com 422", async () => {
     const res = await request(app)
       .post("/auth/login")
       .send({ email: TEST_USER.email });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
   });
 });
 

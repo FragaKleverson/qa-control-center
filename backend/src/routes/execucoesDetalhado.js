@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const { executionsService } = require("../services");
+const { validate } = require("../middleware/validate");
+const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
+const { createSchema, updateSchema, updateResultSchema } = require("../validators/execucoes");
 
 // GET - Listar todas as execuções
 router.get("/", async (req, res, next) => {
@@ -23,7 +26,7 @@ router.get("/stats/summary", async (req, res, next) => {
 });
 
 // GET - Obter execução por ID
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const execution = await executionsService.getById(req.params.id);
     if (!execution) return res.status(404).json({ error: "Execução não encontrada" });
@@ -34,7 +37,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // POST - Criar nova execução
-router.post("/", async (req, res) => {
+router.post("/", validate(createSchema), async (req, res) => {
   try {
     const execution = await executionsService.create(req.body);
     res.status(201).json(execution);
@@ -45,7 +48,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT - Atualizar execução
-router.put("/:id", async (req, res) => {
+router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res) => {
   try {
     const execution = await executionsService.update(req.params.id, req.body);
     res.json(execution);
@@ -56,7 +59,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE - Deletar execução
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validate(idParamSchema, "params"), async (req, res) => {
   try {
     await executionsService.delete(req.params.id);
     res.json({ message: "Execução deletada com sucesso" });
@@ -67,7 +70,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 // GET - Listar resultados de test cases de uma execução
-router.get("/:id/results", async (req, res, next) => {
+router.get("/:id/results", validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const results = await executionsService.getResults(req.params.id);
     res.json(results);
@@ -77,10 +80,9 @@ router.get("/:id/results", async (req, res, next) => {
 });
 
 // PUT - Atualizar status de um test case em uma execução
-router.put("/:id/results/:projetoId", async (req, res) => {
+router.put("/:id/results/:projetoId", validate(idAndProjetoIdSchema, "params"), validate(updateResultSchema), async (req, res) => {
   try {
     const { status, comentario } = req.body;
-    if (!status) return res.status(400).json({ error: "status é obrigatório" });
     const result = await executionsService.updateResult(
       req.params.id,
       req.params.projetoId,
@@ -95,7 +97,7 @@ router.put("/:id/results/:projetoId", async (req, res) => {
 });
 
 // POST - Finalizar execução (calcula status final e bloqueia edição)
-router.post("/:id/finalize", async (req, res) => {
+router.post("/:id/finalize", validate(idParamSchema, "params"), async (req, res) => {
   try {
     const execution = await executionsService.finalize(req.params.id);
     res.json(execution);

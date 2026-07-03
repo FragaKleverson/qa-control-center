@@ -86,11 +86,11 @@ describe("Test Plans API - Suite completa", () => {
             expect(res.statusCode).toBe(201);
         });
 
-        it("deve retornar 400 sem titulo", async () => {
+        it("deve retornar 422 sem titulo", async () => {
             const res = await request(app)
                 .post("/test-plans")
                 .send({ descricao: "sem titulo" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         it("deve persistir todos os campos corretamente", async () => {
@@ -171,10 +171,10 @@ describe("Test Plans API - Suite completa", () => {
             expect(suites.body).toHaveLength(0);
         });
 
-        it("deve retornar 400 ao vincular sem suite_id", async () => {
+        it("deve retornar 422 ao vincular sem suite_id", async () => {
             const plan = await createPlan();
             const res = await request(app).post(`/test-plans/${plan.id}/suites`).send({});
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
     });

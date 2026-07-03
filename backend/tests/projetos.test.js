@@ -113,27 +113,27 @@ describe("Projetos API - Suite completa", () => {
             expect(busca.body.feature).toBe(PAYLOAD_VALIDO.feature);
         });
 
-        it("deve retornar 400 sem titulo", async () => {
+        it("deve retornar 422 sem titulo", async () => {
             const { titulo, ...sem } = PAYLOAD_VALIDO;
             const res = await request(app).post("/projetos").send(sem);
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve retornar 400 sem descricao", async () => {
+        it("deve retornar 422 sem descricao", async () => {
             const { descricao, ...sem } = PAYLOAD_VALIDO;
             const res = await request(app).post("/projetos").send(sem);
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve retornar 400 sem feature", async () => {
+        it("deve retornar 422 sem feature", async () => {
             const { feature, ...sem } = PAYLOAD_VALIDO;
             const res = await request(app).post("/projetos").send(sem);
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve retornar 400 para título composto só de espaços", async () => {
+        it("deve retornar 422 para título composto só de espaços", async () => {
             const res = await request(app).post("/projetos").send({ ...PAYLOAD_VALIDO, titulo: "   " });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         it("deve aceitar cenarios como array vazio", async () => {
@@ -239,7 +239,7 @@ describe("Projetos API - Suite completa", () => {
             expect(res.body).toHaveProperty("id");
         });
 
-        it("deve rejeitar sem titulo (400)", async () => {
+        it("deve rejeitar sem titulo (422)", async () => {
             const res = await request(app)
                 .post("/projetos")
                 .send({
@@ -248,10 +248,10 @@ describe("Projetos API - Suite completa", () => {
                     cenarios: []
                 });
 
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve rejeitar sem descricao (400)", async () => {
+        it("deve rejeitar sem descricao (422)", async () => {
             const res = await request(app)
                 .post("/projetos")
                 .send({
@@ -260,10 +260,10 @@ describe("Projetos API - Suite completa", () => {
                     cenarios: []
                 });
 
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
-        it("deve rejeitar sem feature (400)", async () => {
+        it("deve rejeitar sem feature (422)", async () => {
             const res = await request(app)
                 .post("/projetos")
                 .send({
@@ -272,7 +272,7 @@ describe("Projetos API - Suite completa", () => {
                     cenarios: []
                 });
 
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         // =========================
@@ -351,7 +351,7 @@ describe("Projetos API - Suite completa", () => {
                     cenarios: []
                 });
 
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
         it("deve persistir projeto e retornar id", async () => {

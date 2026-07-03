@@ -116,11 +116,11 @@ describe("Execuções API - Suite completa", () => {
             expect(res.body.status).toBe("pending");
         });
 
-        it("deve retornar 400 sem suite_id", async () => {
+        it("deve retornar 422 sem suite_id", async () => {
             const res = await request(app)
                 .post("/execucoes")
                 .send({ ambiente: "staging" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
     });
@@ -197,7 +197,7 @@ describe("Execuções API - Suite completa", () => {
             expect(res.body.status).toBe("passed");
         });
 
-        it("deve retornar 400 ao atualizar resultado sem status", async () => {
+        it("deve retornar 422 ao atualizar resultado sem status", async () => {
             const suite = await createSuite();
             const projeto = await createProjeto();
             const exec = await createExecucao(suite.id);
@@ -210,7 +210,7 @@ describe("Execuções API - Suite completa", () => {
             const res = await request(app)
                 .put(`/execucoes/${exec.id}/results/${projeto.id}`)
                 .send({});
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(422);
         });
 
     });
@@ -231,17 +231,31 @@ describe("Execuções API - Suite completa", () => {
         });
 
         it("deve contabilizar execuções corretamente por status", async () => {
+            // getStats() conta execution_results (resultados de test cases), não execucoes
+            // Criamos 1 suite + 1 projeto + 3 execucoes, cada uma com 1 result diferente
             const suite = await createSuite();
-            // Cria 2 pending e 1 passed direto no banco
-            await createExecucao(suite.id);
-            await createExecucao(suite.id);
+            const projeto = await createProjeto();
+
+            const exec1 = await createExecucao(suite.id);
+            const exec2 = await createExecucao(suite.id);
+            const exec3 = await createExecucao(suite.id);
+
+            // 2 pending + 1 passed → total: 3, pending: 2, passed: 1
             await pool.query(
-                "INSERT INTO execucoes (suite_id, ambiente, status) VALUES ($1, 'staging', 'passed')",
-                [suite.id]
+                "INSERT INTO execution_results (execucao_id, projeto_id, status) VALUES ($1, $2, 'pending')",
+                [exec1.id, projeto.id]
+            );
+            await pool.query(
+                "INSERT INTO execution_results (execucao_id, projeto_id, status) VALUES ($1, $2, 'pending')",
+                [exec2.id, projeto.id]
+            );
+            await pool.query(
+                "INSERT INTO execution_results (execucao_id, projeto_id, status) VALUES ($1, $2, 'passed')",
+                [exec3.id, projeto.id]
             );
 
             const res = await request(app).get("/execucoes/stats/summary");
-            expect(res.body.total).toBe(3);
+            expect(res.body.total).toBe(3);   // total de execution_results
             expect(res.body.pending).toBe(2);
             expect(res.body.passed).toBe(1);
         });
