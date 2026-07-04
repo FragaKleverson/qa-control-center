@@ -141,9 +141,9 @@ describe("Execuções API - Suite completa", () => {
             expect(busca.statusCode).toBe(404);
         });
 
-        it("deve retornar 400 para ID inexistente", async () => {
+        it("deve retornar 404 para ID inexistente", async () => {
             const res = await request(app).delete("/execucoes/999999");
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(404);
         });
 
     });

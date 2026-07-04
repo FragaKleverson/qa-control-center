@@ -178,9 +178,9 @@ describe("Projetos API - Suite completa", () => {
             expect(busca.body.descricao).toBe("Desc Original");
         });
 
-        it("deve retornar 400 para ID inexistente", async () => {
+        it("deve retornar 404 para ID inexistente", async () => {
             const res = await request(app).put("/projetos/999999").send({ titulo: "x" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(404);
         });
 
     });
@@ -205,9 +205,9 @@ describe("Projetos API - Suite completa", () => {
             expect(busca.statusCode).toBe(404);
         });
 
-        it("deve retornar 400 ao tentar deletar ID inexistente", async () => {
+        it("deve retornar 404 ao tentar deletar ID inexistente", async () => {
             const res = await request(app).delete("/projetos/999999");
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(404);
         });
 
     });

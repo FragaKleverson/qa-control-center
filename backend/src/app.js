@@ -172,6 +172,15 @@ app.use("/execucoes", execucoesDetalhado);
 app.use("/relatorios", relatorios);
 
 /* =========================
+   HANDLER 404 — ROTA NÃO ENCONTRADA
+   Captura qualquer requisição que não bateu em nenhuma rota registrada.
+   Deve vir ANTES do errorHandler global.
+========================= */
+app.use((req, res) => {
+  res.status(404).json({ error: "Rota não encontrada" });
+});
+
+/* =========================
    HANDLER DE ERROS GLOBAL
    Deve ser o ÚLTIMO middleware.
    Captura erros passados via next(err) e garante que detalhes

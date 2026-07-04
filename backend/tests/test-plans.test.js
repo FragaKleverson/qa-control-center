@@ -116,9 +116,9 @@ describe("Test Plans API - Suite completa", () => {
             expect(busca.statusCode).toBe(404);
         });
 
-        it("deve retornar 400 para ID inexistente", async () => {
+        it("deve retornar 404 para ID inexistente", async () => {
             const res = await request(app).delete("/test-plans/999999");
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(404);
         });
 
     });
@@ -210,11 +210,11 @@ describe("Test Plans API - Suite completa", () => {
             expect(res.body.status).toBe("pending");
         });
 
-        it("deve retornar 400 para plan inexistente", async () => {
+        it("deve retornar 404 para plan inexistente", async () => {
             const res = await request(app)
                 .post("/test-plans/999999/execute")
                 .send({ ambiente: "staging" });
-            expect(res.statusCode).toBe(400);
+            expect(res.statusCode).toBe(404);
         });
 
     });
