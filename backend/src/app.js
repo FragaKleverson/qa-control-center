@@ -3,11 +3,11 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const morgan = require("morgan");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const hpp = require("hpp");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger");
 const config = require("./config/env");
+const { globalLimiter, perUserLimiter } = require("./middleware/rateLimiters");
 const projetosRoutes = require("./routes/projetos");
 const testSuitesRoutes = require("./routes/testSuites");
 const requirementsRoutes = require("./routes/requirements");
@@ -87,21 +87,13 @@ app.use(
 );
 
 /* =========================
-   RATE LIMITING
-   Limita cada IP a RATE_LIMIT_MAX requisições por janela de tempo.
-   Previne ataques de força-bruta e DoS.
-   Desativado em ambiente de teste para não interferir nas suites.
+   RATE LIMITING — Global IP
+   Teto geral: limita cada IP a RATE_LIMIT_MAX req por janela.
+   Desativado em teste via skip() interno do limiter.
+   Brute-force e per-user limiters ficam em middleware/rateLimiters.js
+   e são aplicados por rota (auth) ou por bloco (rotas protegidas).
 ========================= */
-if (!config.isTest) {
-  const limiter = rateLimit({
-    windowMs: config.rateLimit.windowMs,
-    max: config.rateLimit.max,
-    standardHeaders: true,  // Retorna info de limite nos headers RateLimit-*
-    legacyHeaders: false,   // Desativa headers X-RateLimit-* obsoletos
-    message: { error: "Muitas requisições. Tente novamente em alguns minutos." },
-  });
-  app.use(limiter);
-}
+app.use(globalLimiter);
 
 /* =========================
    HTTP PARAMETER POLLUTION
@@ -147,13 +139,14 @@ app.param("projetoId", numericParamValidator);
 app.use("/auth", authRoutes);
 
 /* =========================
-   AUTENTICAÇÃO JWT
-   Protege todas as rotas declaradas abaixo.
-   Desativado em ambiente de teste (NODE_ENV=test) para não interferir
-   nos testes de integração existentes — auth é testado em auth.test.js.
+   AUTENTICAÇÃO JWT + PER-USER RATE LIMIT
+   authMiddleware: protege todas as rotas abaixo (desativado em teste).
+   perUserLimiter: após auth, chaveado por user ID — previne abuso mesmo
+   com múltiplos IPs (desativado em teste via skip() interno).
 ========================= */
 if (process.env.NODE_ENV !== "test") {
   app.use(authMiddleware);
+  app.use(perUserLimiter);
 }
 
 /* =========================

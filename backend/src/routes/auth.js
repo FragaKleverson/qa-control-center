@@ -3,11 +3,13 @@ const router = express.Router();
 const authService = require("../services/authService");
 const { validate } = require("../middleware/validate");
 const { registerSchema, loginSchema } = require("../validators/auth");
+const { authLoginLimiter, authRegisterLimiter } = require("../middleware/rateLimiters");
+const config = require("../config/env");
 
 // Middleware: verifica se o x-register-token está correto antes de validar o body
 function requireRegisterToken(req, res, next) {
   const provided = req.headers["x-register-token"];
-  if (!provided || provided !== process.env.REGISTER_TOKEN) {
+  if (!provided || provided !== config.registerToken) {
     return res.status(403).json({ error: "Token de registro inválido ou ausente" });
   }
   next();
@@ -60,8 +62,8 @@ function requireRegisterToken(req, res, next) {
  *       403:
  *         description: Token de registro inválido
  */
-// Ordem: 1) token check → 2) validação body → 3) handler
-router.post("/register", requireRegisterToken, validate(registerSchema), async (req, res, next) => {
+// Ordem: 1) rate limit → 2) token check → 3) validação body → 4) handler
+router.post("/register", authRegisterLimiter, requireRegisterToken, validate(registerSchema), async (req, res, next) => {
   try {
     const user = await authService.register(req.body);
     res.status(201).json(user);
@@ -114,7 +116,7 @@ router.post("/register", requireRegisterToken, validate(registerSchema), async (
  *       401:
  *         description: Email ou senha inválidos
  */
-router.post("/login", validate(loginSchema), async (req, res, next) => {
+router.post("/login", authLoginLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const result = await authService.login(req.body);
     res.json(result);
