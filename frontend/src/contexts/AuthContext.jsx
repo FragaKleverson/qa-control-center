@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from "react";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -13,15 +14,9 @@ export function AuthProvider({ children }) {
   });
 
   const login = useCallback(async (email, password) => {
-    const res = await fetch("http://localhost:3001/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    const data = await authAPI.login(email, password);
 
-    const data = await res.json();
-
-    if (!res.ok) {
+    if (!data.token) {
       throw new Error(data.error || "Erro ao fazer login");
     }
 

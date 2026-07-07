@@ -1,5 +1,7 @@
 // API Service - Centraliza todas as chamadas à API
-const API_BASE_URL = "http://localhost:3001";
+// A URL base é definida em frontend/.env (ou .env.local) via VITE_API_BASE_URL.
+// Nunca hardcode a URL aqui — use a variável de ambiente para suportar múltiplos ambientes.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
 // Wrapper que injeta o Bearer token e redireciona para /login em 401
 function apiFetch(url, options = {}) {

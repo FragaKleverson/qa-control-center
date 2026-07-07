@@ -1,19 +1,12 @@
 const app = require("./app");
+const { PORT } = require("./config/env");
 
-// Validação de variáveis de ambiente obrigatórias em produção/desenvolvimento
-if (!process.env.JWT_SECRET) {
-  console.error("FATAL: JWT_SECRET não configurado. Defina a variável de ambiente antes de iniciar.");
-  process.exit(1);
-}
-if (!process.env.REGISTER_TOKEN) {
-  console.error("FATAL: REGISTER_TOKEN não configurado. Defina a variável de ambiente antes de iniciar.");
-  process.exit(1);
-}
+// Variáveis obrigatórias já validadas em config/env.js no boot
 
 async function start() {
   try {
-    app.listen(3001, "0.0.0.0", () => {
-      console.log("🚀 SERVER NA PORTA 3001");
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 SERVER NA PORTA ${PORT}`);
     });
 
   } catch (err) {
