@@ -23,11 +23,14 @@ async function clearTables() {
 }
 
 /**
- * Remove todos os usuários e reinicia a sequence.
- * Chamado apenas em auth.test.js para não interferir nos outros testes.
+ * Remove todos os usuários, tokens de reset e tokens revogados.
+ * Chamado em auth.test.js para não interferir nos outros testes.
  */
 async function clearUsers() {
-  await pool.query(`TRUNCATE TABLE users RESTART IDENTITY`);
+  // password_reset_tokens e revoked_tokens são limpos via CASCADE ou explicitamente
+  await pool.query(`
+    TRUNCATE TABLE password_reset_tokens, revoked_tokens, users RESTART IDENTITY CASCADE
+  `);
 }
 
 /**

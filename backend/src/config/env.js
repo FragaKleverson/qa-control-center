@@ -103,4 +103,8 @@ module.exports = {
 
   // ── Bcrypt ────────────────────────────────────────────────────────────────
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
+
+  // ── Password Reset ────────────────────────────────────────────────────────
+  // Tempo de validade do token de reset de senha (em ms). Padrão: 1 hora.
+  passwordResetExpiresMs: Number(process.env.PASSWORD_RESET_EXPIRES_MS) || 60 * 60 * 1000,
 };
