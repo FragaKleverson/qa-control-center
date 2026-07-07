@@ -75,10 +75,30 @@ module.exports = {
     .map((o) => o.trim())
     .filter(Boolean),
 
-  // ── Rate Limiting ──────────────────────────────────────────────────────────
+  // ── Rate Limiting — Global (todas as rotas) ────────────────────────────────
   rateLimit: {
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
     max: Number(process.env.RATE_LIMIT_MAX) || 200,
+  },
+
+  // ── Rate Limiting — Auth Login (brute-force) ───────────────────────────────
+  // skipSuccessfulRequests ativo: apenas tentativas falhas consomem cota.
+  rateLimitAuth: {
+    windowMs: Number(process.env.RATE_LIMIT_AUTH_WINDOW_MS) || 15 * 60 * 1000, // 15 min
+    max: Number(process.env.RATE_LIMIT_AUTH_MAX) || 10,  // 10 tentativas falhas por IP
+  },
+
+  // ── Rate Limiting — Register ───────────────────────────────────────────────
+  rateLimitRegister: {
+    windowMs: Number(process.env.RATE_LIMIT_REGISTER_WINDOW_MS) || 60 * 60 * 1000, // 1 hora
+    max: Number(process.env.RATE_LIMIT_REGISTER_MAX) || 5, // 5 cadastros por IP por hora
+  },
+
+  // ── Rate Limiting — Per-user (rotas autenticadas) ──────────────────────────
+  // Chaveado pelo ID do usuário; previne abuso mesmo com IPs rotativos.
+  rateLimitUser: {
+    windowMs: Number(process.env.RATE_LIMIT_USER_WINDOW_MS) || 15 * 60 * 1000, // 15 min
+    max: Number(process.env.RATE_LIMIT_USER_MAX) || 300, // 300 req por usuário
   },
 
   // ── Bcrypt ────────────────────────────────────────────────────────────────
