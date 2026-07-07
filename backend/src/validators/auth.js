@@ -12,7 +12,10 @@ const registerSchema = z.object({
     .min(2, "Nome deve ter pelo menos 2 caracteres")
     .max(255, "Nome muito longo"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+  password: z
+    .string()
+    .min(8, "Senha deve ter pelo menos 8 caracteres")
+    .max(128, "Senha muito longa"),
 });
 
 // Login: apenas email e senha — sem regra de tamanho mínimo de senha aqui
@@ -22,4 +25,18 @@ const loginSchema = z.object({
   password: z.string().min(1, "Senha é obrigatória"),
 });
 
-module.exports = { registerSchema, loginSchema };
+// Forgot password: apenas email
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Email inválido"),
+});
+
+// Reset password: token + nova senha
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token é obrigatório"),
+  password: z
+    .string()
+    .min(8, "Senha deve ter pelo menos 8 caracteres")
+    .max(128, "Senha muito longa"),
+});
+
+module.exports = { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema };

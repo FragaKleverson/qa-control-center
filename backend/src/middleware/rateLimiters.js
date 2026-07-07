@@ -69,6 +69,18 @@ const perUserLimiter = rateLimit({
   message: { error: "Limite de requisições atingido. Tente novamente em alguns minutos." },
 });
 
+// ── 5. Password reset limiter ─────────────────────────────────────────────────
+// Aplicado em POST /auth/forgot-password.
+// Evita spam de tokens de reset (3 por IP por 15 min por padrão).
+const passwordResetLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_PWD_RESET_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_PWD_RESET_MAX) || 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => config.isTest,
+  message: { error: "Muitas solicitações de reset. Aguarde antes de tentar novamente." },
+});
+
 /**
  * Fábrica para criar limiters com configuração personalizada.
  * Destinada exclusivamente aos testes de integração: o `skip` padrão é
@@ -93,6 +105,7 @@ module.exports = {
   globalLimiter,
   authLoginLimiter,
   authRegisterLimiter,
+  passwordResetLimiter,
   perUserLimiter,
   createLimiter,
 };

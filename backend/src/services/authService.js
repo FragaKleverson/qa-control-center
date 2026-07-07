@@ -1,14 +1,21 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
+const config = require("../config/env");
 
-// Rounds reduzidos em teste para performance; 12 em produção
-const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+// Bcrypt rounds via config centralizado
+const BCRYPT_ROUNDS = config.bcryptRounds;
 
 // Hash fictício de formato válido para prevenir timing attacks
 // (bcrypt.compare sempre executa, mesmo quando o usuário não existe)
 const DUMMY_HASH =
   "$2b$12$invalidhashfortimingequalityXXXXXXXXXXXXXXXXXXXXXXXX.";
+
+/** SHA-256 do token bruto — o que é armazenado no banco */
+function hashToken(raw) {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
 
 async function register({ name, email, password }) {
   if (!name || !email || !password) {
@@ -64,13 +71,123 @@ async function login({ email, password }) {
     throw err;
   }
 
+  // jti (JWT ID) único por token — permite revogação individual no logout
+  const jti = crypto.randomUUID();
+
   const token = jwt.sign(
-    { sub: user.id, email: user.email, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "8h" }
+    { sub: user.id, email: user.email, name: user.name, jti },
+    config.jwt.secret,
+    { expiresIn: config.jwt.expiresIn }
   );
 
   return { token, user: { id: user.id, name: user.name, email: user.email } };
 }
 
-module.exports = { register, login };
+/**
+ * Revoga o token atual adicionando seu JTI à blocklist.
+ * Faz limpeza lazy dos tokens expirados para não crescer sem controle.
+ *
+ * @param {string} jti - JWT ID do token a revogar
+ * @param {number} exp - Unix timestamp (segundos) da expiração do token
+ */
+async function logout(jti, exp) {
+  if (!jti) return; // tokens legados sem jti — nada a fazer
+
+  // Limpeza lazy: remove tokens já expirados antes de inserir novo
+  await pool.query("DELETE FROM revoked_tokens WHERE expires_at < NOW()");
+
+  const expiresAt = new Date(exp * 1000);
+  await pool.query(
+    "INSERT INTO revoked_tokens (jti, expires_at) VALUES ($1, $2) ON CONFLICT (jti) DO NOTHING",
+    [jti, expiresAt]
+  );
+}
+
+/**
+ * Inicia o fluxo de redefinição de senha.
+ * Retorna o token bruto para ser enviado ao usuário (via e-mail em produção).
+ * Sempre responde com a mesma mensagem, independente do e-mail existir ou não.
+ *
+ * @param {string} email
+ * @returns {string|null} token bruto (apenas em dev/test), ou null se e-mail não encontrado
+ */
+async function forgotPassword(email) {
+  const result = await pool.query(
+    "SELECT id FROM users WHERE email = $1",
+    [email.toLowerCase().trim()]
+  );
+
+  if (result.rows.length === 0) {
+    return null; // e-mail não existe — rota responde igual para não vazar info
+  }
+
+  const userId = result.rows[0].id;
+
+  // Invalida tokens anteriores não utilizados deste usuário
+  await pool.query(
+    "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL",
+    [userId]
+  );
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashToken(rawToken);
+  const expiresAt = new Date(Date.now() + config.passwordResetExpiresMs);
+
+  await pool.query(
+    "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+    [userId, tokenHash, expiresAt]
+  );
+
+  return rawToken;
+}
+
+/**
+ * Conclui o fluxo de redefinição de senha.
+ *
+ * @param {string} token - Token bruto recebido do usuário
+ * @param {string} newPassword - Nova senha
+ */
+async function resetPassword(token, newPassword) {
+  const tokenHash = hashToken(token);
+
+  const result = await pool.query(
+    `SELECT id, user_id, expires_at, used_at
+     FROM password_reset_tokens
+     WHERE token_hash = $1`,
+    [tokenHash]
+  );
+
+  if (result.rows.length === 0) {
+    const err = new Error("Token inválido ou expirado");
+    err.status = 400;
+    throw err;
+  }
+
+  const row = result.rows[0];
+
+  if (row.used_at) {
+    const err = new Error("Token já utilizado");
+    err.status = 400;
+    throw err;
+  }
+
+  if (new Date(row.expires_at) < new Date()) {
+    const err = new Error("Token expirado");
+    err.status = 400;
+    throw err;
+  }
+
+  const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await pool.query(
+    "UPDATE users SET password_hash = $1 WHERE id = $2",
+    [hash, row.user_id]
+  );
+
+  await pool.query(
+    "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1",
+    [row.id]
+  );
+}
+
+module.exports = { register, login, logout, forgotPassword, resetPassword };
+

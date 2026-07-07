@@ -154,5 +154,36 @@ model User {
   password_hash String
   created_at    DateTime @default(now()) @db.Timestamptz
 
+  password_reset_tokens PasswordResetToken[]
+
   @@map("users")
+}
+
+// =============================================================================
+// TOKENS DE RESET DE SENHA
+// =============================================================================
+model PasswordResetToken {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token_hash String
+  expires_at DateTime  @db.Timestamptz
+  used_at    DateTime? @db.Timestamptz
+  created_at DateTime  @default(now()) @db.Timestamptz
+
+  @@map("password_reset_tokens")
+}
+
+// =============================================================================
+// TOKENS REVOGADOS (logout seguro)
+// Armazena JTIs de tokens invalidados até expirarem naturalmente.
+// =============================================================================
+model RevokedToken {
+  id         Int      @id @default(autoincrement())
+  jti        String   @unique
+  expires_at DateTime @db.Timestamptz
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  @@index([expires_at])
+  @@map("revoked_tokens")
 }

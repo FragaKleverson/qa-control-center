@@ -172,3 +172,180 @@ describe("Auth middleware - rota protegida", () => {
     expect(res.body.user).toHaveProperty("email", TEST_USER.email);
   });
 });
+
+// =====================================================
+// POST /auth/logout
+// =====================================================
+describe("POST /auth/logout", () => {
+  beforeEach(async () => {
+    await createTestUser();
+  });
+
+  it("deve fazer logout e revogar o token", async () => {
+    const loginRes = await request(app)
+      .post("/auth/login")
+      .send({ email: TEST_USER.email, password: TEST_USER.password });
+
+    const { token } = loginRes.body;
+    expect(token).toBeDefined();
+
+    // Logout
+    const logoutRes = await request(app)
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(logoutRes.statusCode).toBe(200);
+    expect(logoutRes.body).toHaveProperty("message");
+  });
+
+  it("token revogado deve ser rejeitado com 401", async () => {
+    const loginRes = await request(app)
+      .post("/auth/login")
+      .send({ email: TEST_USER.email, password: TEST_USER.password });
+
+    const { token } = loginRes.body;
+
+    // Revoga
+    await request(app)
+      .post("/auth/logout")
+      .set("Authorization", `Bearer ${token}`);
+
+    // Tenta usar o token revogado em rota protegida
+    const res = await request(securedApp)
+      .get("/secured")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body.error).toMatch(/revogado/i);
+  });
+
+  it("deve retornar 401 sem token", async () => {
+    const res = await request(app).post("/auth/logout");
+    expect(res.statusCode).toBe(401);
+  });
+});
+
+// =====================================================
+// POST /auth/forgot-password
+// =====================================================
+describe("POST /auth/forgot-password", () => {
+  beforeEach(async () => {
+    await createTestUser();
+  });
+
+  it("deve retornar 200 com e-mail válido e expor _dev_token em dev/test", async () => {
+    const res = await request(app)
+      .post("/auth/forgot-password")
+      .send({ email: TEST_USER.email });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty("message");
+    // Em test mode, _dev_token deve estar presente para facilitar testes
+    expect(res.body).toHaveProperty("_dev_token");
+    expect(typeof res.body._dev_token).toBe("string");
+    expect(res.body._dev_token.length).toBeGreaterThan(0);
+  });
+
+  it("deve retornar 200 mesmo com e-mail inexistente (não vaza informação)", async () => {
+    const res = await request(app)
+      .post("/auth/forgot-password")
+      .send({ email: "nao@existe.com" });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty("message");
+    // Para e-mail inexistente, _dev_token NÃO deve aparecer
+    expect(res.body._dev_token).toBeUndefined();
+  });
+
+  it("deve rejeitar e-mail inválido com 422", async () => {
+    const res = await request(app)
+      .post("/auth/forgot-password")
+      .send({ email: "nao-e-um-email" });
+
+    expect(res.statusCode).toBe(422);
+  });
+});
+
+// =====================================================
+// POST /auth/reset-password
+// =====================================================
+describe("POST /auth/reset-password", () => {
+  let resetToken;
+
+  beforeEach(async () => {
+    await createTestUser();
+    // Obtém token de reset via forgot-password (disponível em dev/test)
+    const res = await request(app)
+      .post("/auth/forgot-password")
+      .send({ email: TEST_USER.email });
+    resetToken = res.body._dev_token;
+  });
+
+  it("deve redefinir senha com token válido", async () => {
+    const novaSenha = "NovaSenha@789";
+
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ token: resetToken, password: novaSenha });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty("message");
+
+    // Confirma que o login com a nova senha funciona
+    const loginRes = await request(app)
+      .post("/auth/login")
+      .send({ email: TEST_USER.email, password: novaSenha });
+    expect(loginRes.statusCode).toBe(200);
+    expect(loginRes.body).toHaveProperty("token");
+  });
+
+  it("deve rejeitar senha antiga após reset", async () => {
+    await request(app)
+      .post("/auth/reset-password")
+      .send({ token: resetToken, password: "NovaSenha@789" });
+
+    const res = await request(app)
+      .post("/auth/login")
+      .send({ email: TEST_USER.email, password: TEST_USER.password });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("deve rejeitar token já utilizado com 400", async () => {
+    await request(app)
+      .post("/auth/reset-password")
+      .send({ token: resetToken, password: "NovaSenha@789" });
+
+    // Segunda tentativa com o mesmo token
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ token: resetToken, password: "OutraSenha@321" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/utilizado/i);
+  });
+
+  it("deve rejeitar token inválido com 400", async () => {
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ token: "token-invalido-qualquer", password: "NovaSenha@789" });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("deve rejeitar senha curta com 422", async () => {
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ token: resetToken, password: "curta" });
+
+    expect(res.statusCode).toBe(422);
+  });
+
+  it("deve rejeitar body sem token com 422", async () => {
+    const res = await request(app)
+      .post("/auth/reset-password")
+      .send({ password: "NovaSenha@789" });
+
+    expect(res.statusCode).toBe(422);
+  });
+});
