@@ -7,6 +7,7 @@ const rateLimit = require("express-rate-limit");
 const hpp = require("hpp");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger");
+const config = require("./config/env");
 const projetosRoutes = require("./routes/projetos");
 const testSuitesRoutes = require("./routes/testSuites");
 const requirementsRoutes = require("./routes/requirements");
@@ -73,17 +74,12 @@ app.use(helmet());
    Requisições sem cabeçalho Origin (Postman, curl, server-to-server)
    são permitidas; origens de browser desconhecidas são bloqueadas.
 ========================= */
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
 app.use(
   cors({
     origin: (origin, callback) => {
       // Requisições sem Origin (mobile apps, ferramentas, APIs internas)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (config.allowedOrigins.includes(origin)) return callback(null, true);
       callback(new Error("Origem não permitida pelo CORS"), false);
     },
     optionsSuccessStatus: 200,
@@ -96,10 +92,10 @@ app.use(
    Previne ataques de força-bruta e DoS.
    Desativado em ambiente de teste para não interferir nas suites.
 ========================= */
-if (process.env.NODE_ENV !== "test") {
+if (!config.isTest) {
   const limiter = rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
-    max: Number(process.env.RATE_LIMIT_MAX) || 200,
+    windowMs: config.rateLimit.windowMs,
+    max: config.rateLimit.max,
     standardHeaders: true,  // Retorna info de limite nos headers RateLimit-*
     legacyHeaders: false,   // Desativa headers X-RateLimit-* obsoletos
     message: { error: "Muitas requisições. Tente novamente em alguns minutos." },
@@ -126,7 +122,7 @@ app.use(bodyParser.json({ limit: "500kb" }));
    Formato "combined" em produção (IP, user-agent, referrer — auditável).
    Formato "dev" em desenvolvimento (colorido, compacto).
 ========================= */
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(morgan(config.isProduction ? "combined" : "dev"));
 
 /* =========================
    VALIDAÇÃO DE PARÂMETROS DE ROTA
