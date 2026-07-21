@@ -26,7 +26,12 @@ Thumbs.db
 # backend output
 DEBUG_BACKEND.docx
 
+# test results (gerados pelo npm test — não commitar)
+backend/test-results*.txt
+backend/test-results/
+
 # test coverage
 coverage/
 *.lcov
-test-results.txt
+.claude/
+.github/
