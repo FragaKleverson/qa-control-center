@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { reportsService } = require("../services");
+const { authorize } = require("../middleware/authorize");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 
 // GET - Listar todos os relatórios/execuções
@@ -14,7 +15,7 @@ router.get("/", async (req, res, next) => {
 });
 
 // POST - Gerar relatório com filtros (JSON)
-router.post("/generate", async (req, res, next) => {
+router.post("/generate", authorize("admin", "qa"), async (req, res, next) => {
   try {
     const report = await reportsService.generateReport(req.body);
     res.json(report);
@@ -24,7 +25,7 @@ router.post("/generate", async (req, res, next) => {
 });
 
 // POST - Exportar relatório como .docx
-router.post("/export", async (req, res, next) => {
+router.post("/export", authorize("admin", "qa"), async (req, res, next) => {
   try {
     const report = await reportsService.generateReport(req.body);
     const { summary, executions } = report;

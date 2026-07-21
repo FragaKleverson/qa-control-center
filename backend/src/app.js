@@ -16,6 +16,7 @@ const statsRoutes = require("./routes/stats");
 const execucoesDetalhado = require("./routes/execucoesDetalhado");
 const relatorios = require("./routes/relatorios");
 const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/admin");
 const authMiddleware = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -147,6 +148,21 @@ app.use("/auth", authRoutes);
 if (process.env.NODE_ENV !== "test") {
   app.use(authMiddleware);
   app.use(perUserLimiter);
+} else {
+  // Em test mode: injeta req.user com role 'admin' por padrão.
+  // Testes de RBAC sobrescrevem via header x-test-role (ex: 'reader', 'qa').
+  // NUNCA ativo em produção — apenas quando NODE_ENV === 'test'.
+  app.use((req, res, next) => {
+    req.user = {
+      id: 1,
+      email: "test@qa.dev",
+      name: "Test User",
+      role: req.headers["x-test-role"] || "admin",
+      jti: null,
+      tokenExp: null,
+    };
+    next();
+  });
 }
 
 /* =========================
@@ -159,6 +175,7 @@ app.use("/test-plans", testPlansRoutes);
 app.use("/stats", statsRoutes);
 app.use("/execucoes", execucoesDetalhado);
 app.use("/relatorios", relatorios);
+app.use("/admin", adminRoutes);
 
 /* =========================
    HANDLER 404 — ROTA NÃO ENCONTRADA

@@ -30,10 +30,15 @@ async function register({ name, email, password }) {
   }
 
   try {
+    // Primeiro usuário registrado recebe role 'admin'; demais recebem 'qa'
+    const countResult = await pool.query("SELECT COUNT(*) FROM users");
+    const isFirstUser = parseInt(countResult.rows[0].count, 10) === 0;
+    const role = isFirstUser ? "admin" : "qa";
+
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const result = await pool.query(
-      "INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
-      [name, email.toLowerCase().trim(), hash]
+      "INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at",
+      [name, email.toLowerCase().trim(), hash, role]
     );
     return result.rows[0];
   } catch (err) {
@@ -54,7 +59,7 @@ async function login({ email, password }) {
   }
 
   const result = await pool.query(
-    "SELECT id, name, email, password_hash FROM users WHERE email = $1",
+    "SELECT id, name, email, password_hash, role FROM users WHERE email = $1",
     [email.toLowerCase().trim()]
   );
   const user = result.rows[0];
@@ -75,12 +80,12 @@ async function login({ email, password }) {
   const jti = crypto.randomUUID();
 
   const token = jwt.sign(
-    { sub: user.id, email: user.email, name: user.name, jti },
+    { sub: user.id, email: user.email, name: user.name, role: user.role, jti },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );
 
-  return { token, user: { id: user.id, name: user.name, email: user.email } };
+  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
 }
 
 /**
@@ -189,5 +194,70 @@ async function resetPassword(token, newPassword) {
   );
 }
 
-module.exports = { register, login, logout, forgotPassword, resetPassword };
+// ─── Gestão de usuários (admin only) ──────────────────────────────────────────
+
+/** Lista todos os usuários (sem password_hash). */
+async function getAllUsers() {
+  const result = await pool.query(
+    "SELECT id, name, email, role, created_at FROM users ORDER BY id"
+  );
+  return result.rows;
+}
+
+const VALID_ROLES = ["admin", "qa", "reader"];
+
+/**
+ * Altera o role de um usuário.
+ * @param {number} targetId - ID do usuário a alterar
+ * @param {number} requesterId - ID de quem faz a requisição (não pode alterar o próprio role)
+ * @param {string} newRole - Novo role ('admin' | 'qa' | 'reader')
+ */
+async function changeUserRole(targetId, requesterId, newRole) {
+  if (!VALID_ROLES.includes(newRole)) {
+    const err = new Error(`Role inválido. Valores aceitos: ${VALID_ROLES.join(", ")}`);
+    err.status = 400;
+    throw err;
+  }
+  if (Number(targetId) === Number(requesterId)) {
+    const err = new Error("Você não pode alterar o próprio role.");
+    err.status = 403;
+    throw err;
+  }
+
+  const result = await pool.query(
+    "UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, email, role",
+    [newRole, targetId]
+  );
+  if (result.rows.length === 0) {
+    const err = new Error("Usuário não encontrado");
+    err.status = 404;
+    throw err;
+  }
+  return result.rows[0];
+}
+
+/**
+ * Deleta um usuário.
+ * @param {number} targetId - ID do usuário a deletar
+ * @param {number} requesterId - Não pode deletar a si mesmo
+ */
+async function deleteUser(targetId, requesterId) {
+  if (Number(targetId) === Number(requesterId)) {
+    const err = new Error("Você não pode deletar sua própria conta.");
+    err.status = 403;
+    throw err;
+  }
+
+  const result = await pool.query(
+    "DELETE FROM users WHERE id = $1 RETURNING id",
+    [targetId]
+  );
+  if (result.rows.length === 0) {
+    const err = new Error("Usuário não encontrado");
+    err.status = 404;
+    throw err;
+  }
+}
+
+module.exports = { register, login, logout, forgotPassword, resetPassword, getAllUsers, changeUserRole, deleteUser };
 

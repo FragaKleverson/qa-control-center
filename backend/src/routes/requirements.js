@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requirementsService } = require("../services");
 const { validate } = require("../middleware/validate");
+const { authorize } = require("../middleware/authorize");
 const { idParamSchema } = require("../validators/common");
 const { createSchema, updateSchema } = require("../validators/requirements");
 
@@ -27,7 +28,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 });
 
 // POST - Criar novo requirement
-router.post("/", validate(createSchema), async (req, res, next) => {
+router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const requirement = await requirementsService.create(req.body);
     res.status(201).json(requirement);
@@ -37,7 +38,7 @@ router.post("/", validate(createSchema), async (req, res, next) => {
 });
 
 // PUT - Atualizar requirement
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
+router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const requirement = await requirementsService.update(req.params.id, req.body);
     res.json(requirement);
@@ -47,7 +48,7 @@ router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), as
 });
 
 // DELETE - Deletar requirement
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await requirementsService.delete(req.params.id);
     res.json({ message: "Requirement deletado com sucesso" });
