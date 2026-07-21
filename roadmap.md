@@ -258,6 +258,7 @@ Separar regras de negócio do acesso ao banco.
 
 * Componentes
 * Fluxos críticos
+* Teste Carga / Performace 
 
 ---
 

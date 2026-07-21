@@ -23,6 +23,11 @@ logs/
 .DS_Store
 Thumbs.db
 
+# IDE / tools
+.vs/
+.claude/
+.github/
+
 # backend output
 DEBUG_BACKEND.docx
 
