@@ -64,8 +64,9 @@ const perUserLimiter = rateLimit({
   max: config.rateLimitUser.max,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => config.isTest,
-  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : req.ip),
+  skip: () => config.isTest,  // validate.keyGeneratorIpFallback: false suprime a ValidationError do express-rate-limit v8
+  // que exige uso do ipKeyGenerator() quando req.ip aparece em keyGenerators customizados.
+  validate: { keyGeneratorIpFallback: false },  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : req.ip),
   message: { error: "Limite de requisições atingido. Tente novamente em alguns minutos." },
 });
 
@@ -96,6 +97,7 @@ function createLimiter(overrides = {}) {
     standardHeaders: true,
     legacyHeaders: false,
     skip: () => false,
+    validate: { keyGeneratorIpFallback: false },
     message: { error: "Limite de requisições atingido." },
     ...overrides,
   });

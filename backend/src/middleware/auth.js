@@ -43,6 +43,7 @@ async function authenticate(req, res, next) {
     id: payload.sub,
     email: payload.email,
     name: payload.name,
+    role: payload.role || "reader", // fallback para tokens legados sem role
     jti: payload.jti,
     tokenExp: payload.exp, // Unix timestamp (segundos) — usado pelo logout
   };

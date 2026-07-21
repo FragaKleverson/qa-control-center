@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { testPlansService } = require("../services");
 const { validate } = require("../middleware/validate");
+const { authorize } = require("../middleware/authorize");
 const { idParamSchema, idAndSuiteIdSchema } = require("../validators/common");
 const { createSchema, updateSchema, addSuiteSchema, executeSchema } = require("../validators/testPlans");
 
@@ -27,7 +28,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 });
 
 // POST - Criar novo test plan
-router.post("/", validate(createSchema), async (req, res, next) => {
+router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const plan = await testPlansService.create(req.body);
     res.status(201).json(plan);
@@ -37,7 +38,7 @@ router.post("/", validate(createSchema), async (req, res, next) => {
 });
 
 // PUT - Atualizar test plan
-router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
+router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
     const plan = await testPlansService.update(req.params.id, req.body);
     res.json(plan);
@@ -47,7 +48,7 @@ router.put("/:id", validate(idParamSchema, "params"), validate(updateSchema), as
 });
 
 // DELETE - Deletar test plan
-router.delete("/:id", validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     await testPlansService.delete(req.params.id);
     res.json({ message: "Test plan deletado com sucesso" });
@@ -67,7 +68,7 @@ router.get("/:id/suites", validate(idParamSchema, "params"), async (req, res, ne
 });
 
 // POST - Vincular suite a um plan
-router.post("/:id/suites", validate(idParamSchema, "params"), validate(addSuiteSchema), async (req, res, next) => {
+router.post("/:id/suites", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(addSuiteSchema), async (req, res, next) => {
   try {
     const result = await testPlansService.addSuite(req.params.id, req.body.suite_id);
     res.status(201).json(result);
@@ -77,7 +78,7 @@ router.post("/:id/suites", validate(idParamSchema, "params"), validate(addSuiteS
 });
 
 // DELETE - Desvincular suite de um plan
-router.delete("/:id/suites/:suiteId", validate(idAndSuiteIdSchema, "params"), async (req, res, next) => {
+router.delete("/:id/suites/:suiteId", authorize("admin", "qa"), validate(idAndSuiteIdSchema, "params"), async (req, res, next) => {
   try {
     await testPlansService.removeSuite(req.params.id, req.params.suiteId);
     res.json({ message: "Suite removida do plan" });
@@ -86,8 +87,8 @@ router.delete("/:id/suites/:suiteId", validate(idAndSuiteIdSchema, "params"), as
   }
 });
 
-// POST - Executar plan (cria execução com todos os test cases das suites)
-router.post("/:id/execute", validate(idParamSchema, "params"), validate(executeSchema), async (req, res, next) => {
+// POST - Executar plan
+router.post("/:id/execute", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(executeSchema), async (req, res, next) => {
   try {
     const execucao = await testPlansService.execute(req.params.id, req.body.ambiente);
     res.status(201).json(execucao);
