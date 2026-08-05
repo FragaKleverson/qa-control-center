@@ -92,4 +92,15 @@ router.delete("/:id/cases/:projetoId", authorize("admin", "qa"), validate(idAndP
   }
 });
 
+// POST - Restaurar test suite soft-deletada (admin only)
+router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
+  try {
+    const restored = await testSuitesService.restore(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "test_suite", entityId: restored.id, action: "RESTORE", newValues: restored, ipAddress: req.ip });
+    res.json(restored);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

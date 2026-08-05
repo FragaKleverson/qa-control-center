@@ -170,12 +170,23 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
  *       200:
  *         description: Projeto deletado
  */
-// DELETE - Deletar projeto
+// DELETE - Deletar projeto (soft delete)
 router.delete("/:id", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const deleted = await projectsService.delete(req.params.id);
     await logAudit({ userId: req.user?.id, entityType: "projeto", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
     res.json({ message: "Projeto deletado com sucesso" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST - Restaurar projeto soft-deletado (admin only)
+router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
+  try {
+    const restored = await projectsService.restore(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "projeto", entityId: restored.id, action: "RESTORE", newValues: restored, ipAddress: req.ip });
+    res.json(restored);
   } catch (err) {
     next(err);
   }

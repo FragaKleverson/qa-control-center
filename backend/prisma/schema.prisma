@@ -23,8 +23,9 @@ model Projeto {
   cenarios   Json?
   created_by Int?
   creator    User?    @relation("ProjetoCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
 
   test_suites       TestSuite[]
   test_suite_cases  TestSuiteCase[]
@@ -44,8 +45,9 @@ model TestSuite {
   projeto    Projeto? @relation(fields: [projeto_id], references: [id], onDelete: Cascade)
   created_by Int?
   creator    User?    @relation("TestSuiteCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
 
   execucoes        Execucao[]
   test_suite_cases TestSuiteCase[]
@@ -65,8 +67,9 @@ model Requirement {
   prioridade String   @default("Medium")
   created_by Int?
   creator    User?    @relation("RequirementCreator", fields: [created_by], references: [id], onDelete: SetNull)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
 
   @@map("requirements")
 }
@@ -81,8 +84,9 @@ model TestPlan {
   escopo     String?  @default("")
   objetivo   String?  @default("")
   ambiente   String?  @default("")
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+  deleted_at DateTime?
 
   test_plan_suites TestPlanSuite[]
 
@@ -104,6 +108,7 @@ model Execucao {
   creator    User?     @relation("ExecucaoCreator", fields: [created_by], references: [id], onDelete: SetNull)
   created_at DateTime  @default(now())
   updated_at DateTime  @default(now())
+  deleted_at DateTime?
 
   execution_results ExecutionResult[]
 

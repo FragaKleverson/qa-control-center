@@ -108,4 +108,15 @@ router.post("/:id/finalize", authorize("admin", "qa"), validate(idParamSchema, "
   }
 });
 
+// POST - Restaurar execução soft-deletada (admin only)
+router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
+  try {
+    const restored = await executionsService.restore(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: restored.id, action: "RESTORE", newValues: restored, ipAddress: req.ip });
+    res.json(restored);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
