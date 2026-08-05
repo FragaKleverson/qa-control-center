@@ -40,7 +40,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 // POST - Criar nova execução
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
-    const execution = await executionsService.create(req.body);
+    const execution = await executionsService.create(req.body, req.user?.id ?? null);
     res.status(201).json(execution);
   } catch (err) {
     next(err);
