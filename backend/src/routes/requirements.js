@@ -62,4 +62,15 @@ router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"
   }
 });
 
+// POST - Restaurar requirement soft-deletado (admin only)
+router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
+  try {
+    const restored = await requirementsService.restore(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "requirement", entityId: restored.id, action: "RESTORE", newValues: restored, ipAddress: req.ip });
+    res.json(restored);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

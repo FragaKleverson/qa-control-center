@@ -161,7 +161,7 @@ Essencial para uso corporativo.
 
 ---
 
-## 10. Soft Delete
+## 10. Soft Delete ✅
 
 ### Implementar
 

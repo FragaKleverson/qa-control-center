@@ -102,4 +102,15 @@ router.post("/:id/execute", authorize("admin", "qa"), validate(idParamSchema, "p
   }
 });
 
+// POST - Restaurar test plan soft-deletado (admin only)
+router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
+  try {
+    const restored = await testPlansService.restore(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "test_plan", entityId: restored.id, action: "RESTORE", newValues: restored, ipAddress: req.ip });
+    res.json(restored);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

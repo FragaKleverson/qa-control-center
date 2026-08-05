@@ -8,12 +8,12 @@ const query = (sql, params) => pool.query(sql, params);
 // ==================== PROJECTS SERVICE ====================
 const projectsService = {
   listAll: async () => {
-    const result = await query("SELECT * FROM projetos ORDER BY created_at DESC");
+    const result = await query("SELECT * FROM projetos WHERE deleted_at IS NULL ORDER BY created_at DESC");
     return result.rows;
   },
 
   getById: async (id) => {
-    const result = await query("SELECT * FROM projetos WHERE id = $1", [id]);
+    const result = await query("SELECT * FROM projetos WHERE id = $1 AND deleted_at IS NULL", [id]);
     return result.rows[0];
   },
 
@@ -32,16 +32,28 @@ const projectsService = {
   update: async (id, data) => {
     const { titulo, descricao, feature } = data;
     const result = await query(
-      "UPDATE projetos SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), feature = COALESCE($3, feature), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *",
+      "UPDATE projetos SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), feature = COALESCE($3, feature), updated_at = CURRENT_TIMESTAMP WHERE id = $4 AND deleted_at IS NULL RETURNING *",
       [titulo || null, descricao || null, feature || null, id]
     );
-    if (result.rows.length === 0) throw new AppError("Projeto não encontrado", 404);
+    if (result.rows.length === 0) throw new AppError("Projeto n\u00e3o encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const result = await query("DELETE FROM projetos WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new AppError("Projeto não encontrado", 404);
+    const result = await query(
+      "UPDATE projetos SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Projeto n\u00e3o encontrado", 404);
+    return result.rows[0];
+  },
+
+  restore: async (id) => {
+    const result = await query(
+      "UPDATE projetos SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Projeto n\u00e3o encontrado ou n\u00e3o est\u00e1 deletado", 404);
     return result.rows[0];
   }
 };
@@ -49,12 +61,12 @@ const projectsService = {
 // ==================== TEST SUITES SERVICE ====================
 const testSuitesService = {
   listAll: async () => {
-    const result = await query("SELECT * FROM test_suites ORDER BY created_at DESC");
+    const result = await query("SELECT * FROM test_suites WHERE deleted_at IS NULL ORDER BY created_at DESC");
     return result.rows;
   },
 
   getById: async (id) => {
-    const result = await query("SELECT * FROM test_suites WHERE id = $1", [id]);
+    const result = await query("SELECT * FROM test_suites WHERE id = $1 AND deleted_at IS NULL", [id]);
     return result.rows[0];
   },
 
@@ -71,16 +83,28 @@ const testSuitesService = {
   update: async (id, data) => {
     const { nome, descricao, projeto_id } = data;
     const result = await query(
-      "UPDATE test_suites SET nome = COALESCE($1, nome), descricao = COALESCE($2, descricao), projeto_id = COALESCE($3, projeto_id), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *",
+      "UPDATE test_suites SET nome = COALESCE($1, nome), descricao = COALESCE($2, descricao), projeto_id = COALESCE($3, projeto_id), updated_at = CURRENT_TIMESTAMP WHERE id = $4 AND deleted_at IS NULL RETURNING *",
       [nome || null, descricao || null, projeto_id || null, id]
     );
-    if (result.rows.length === 0) throw new AppError("Suite não encontrada", 404);
+    if (result.rows.length === 0) throw new AppError("Suite n\u00e3o encontrada", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const result = await query("DELETE FROM test_suites WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new AppError("Suite não encontrada", 404);
+    const result = await query(
+      "UPDATE test_suites SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Suite n\u00e3o encontrada", 404);
+    return result.rows[0];
+  },
+
+  restore: async (id) => {
+    const result = await query(
+      "UPDATE test_suites SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Suite n\u00e3o encontrada ou n\u00e3o est\u00e1 deletada", 404);
     return result.rows[0];
   },
 
@@ -118,12 +142,12 @@ const testSuitesService = {
 // ==================== REQUIREMENTS SERVICE ====================
 const requirementsService = {
   listAll: async () => {
-    const result = await query("SELECT * FROM requirements ORDER BY created_at DESC");
+    const result = await query("SELECT * FROM requirements WHERE deleted_at IS NULL ORDER BY created_at DESC");
     return result.rows;
   },
 
   getById: async (id) => {
-    const result = await query("SELECT * FROM requirements WHERE id = $1", [id]);
+    const result = await query("SELECT * FROM requirements WHERE id = $1 AND deleted_at IS NULL", [id]);
     return result.rows[0];
   },
 
@@ -140,16 +164,28 @@ const requirementsService = {
   update: async (id, data) => {
     const { titulo, descricao, status, prioridade } = data;
     const result = await query(
-      "UPDATE requirements SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), status = COALESCE($3, status), prioridade = COALESCE($4, prioridade), updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING *",
+      "UPDATE requirements SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), status = COALESCE($3, status), prioridade = COALESCE($4, prioridade), updated_at = CURRENT_TIMESTAMP WHERE id = $5 AND deleted_at IS NULL RETURNING *",
       [titulo || null, descricao || null, status || null, prioridade || null, id]
     );
-    if (result.rows.length === 0) throw new AppError("Requirement não encontrado", 404);
+    if (result.rows.length === 0) throw new AppError("Requirement n\u00e3o encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const result = await query("DELETE FROM requirements WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new AppError("Requirement não encontrado", 404);
+    const result = await query(
+      "UPDATE requirements SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Requirement n\u00e3o encontrado", 404);
+    return result.rows[0];
+  },
+
+  restore: async (id) => {
+    const result = await query(
+      "UPDATE requirements SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Requirement n\u00e3o encontrado ou n\u00e3o est\u00e1 deletado", 404);
     return result.rows[0];
   }
 };
@@ -157,12 +193,12 @@ const requirementsService = {
 // ==================== TEST PLANS SERVICE ====================
 const testPlansService = {
   listAll: async () => {
-    const result = await query("SELECT * FROM test_plans ORDER BY created_at DESC");
+    const result = await query("SELECT * FROM test_plans WHERE deleted_at IS NULL ORDER BY created_at DESC");
     return result.rows;
   },
 
   getById: async (id) => {
-    const result = await query("SELECT * FROM test_plans WHERE id = $1", [id]);
+    const result = await query("SELECT * FROM test_plans WHERE id = $1 AND deleted_at IS NULL", [id]);
     return result.rows[0];
   },
 
@@ -179,16 +215,28 @@ const testPlansService = {
   update: async (id, data) => {
     const { titulo, descricao, escopo, objetivo, ambiente } = data;
     const result = await query(
-      "UPDATE test_plans SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), escopo = COALESCE($3, escopo), objetivo = COALESCE($4, objetivo), ambiente = COALESCE($5, ambiente), updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *",
+      "UPDATE test_plans SET titulo = COALESCE($1, titulo), descricao = COALESCE($2, descricao), escopo = COALESCE($3, escopo), objetivo = COALESCE($4, objetivo), ambiente = COALESCE($5, ambiente), updated_at = CURRENT_TIMESTAMP WHERE id = $6 AND deleted_at IS NULL RETURNING *",
       [titulo || null, descricao || null, escopo || null, objetivo || null, ambiente || null, id]
     );
-    if (result.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
+    if (result.rows.length === 0) throw new AppError("Test Plan n\u00e3o encontrado", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const result = await query("DELETE FROM test_plans WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
+    const result = await query(
+      "UPDATE test_plans SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Test Plan n\u00e3o encontrado", 404);
+    return result.rows[0];
+  },
+
+  restore: async (id) => {
+    const result = await query(
+      "UPDATE test_plans SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Test Plan n\u00e3o encontrado ou n\u00e3o est\u00e1 deletado", 404);
     return result.rows[0];
   },
 
@@ -226,7 +274,7 @@ const testPlansService = {
 
   // Cria execução a partir de um plan (popula execution_results com todos os test cases)
   execute: async (planId, ambiente = "staging", userId = null) => {
-    const plan = await query("SELECT * FROM test_plans WHERE id = $1", [planId]);
+    const plan = await query("SELECT * FROM test_plans WHERE id = $1 AND deleted_at IS NULL", [planId]);
     if (plan.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
 
     // Buscar a primeira suite do plan para usar como suite_id na execução
@@ -281,13 +329,14 @@ const executionsService = {
        FROM execucoes e
        LEFT JOIN test_suites ts ON ts.id = e.suite_id
        LEFT JOIN projetos p ON p.id = ts.projeto_id
+       WHERE e.deleted_at IS NULL
        ORDER BY e.created_at DESC`
     );
     return result.rows;
   },
 
   getById: async (id) => {
-    const result = await query("SELECT * FROM execucoes WHERE id = $1", [id]);
+    const result = await query("SELECT * FROM execucoes WHERE id = $1 AND deleted_at IS NULL", [id]);
     return result.rows[0];
   },
 
@@ -304,16 +353,28 @@ const executionsService = {
   update: async (id, data) => {
     const { status, resultado } = data;
     const result = await query(
-      "UPDATE execucoes SET status = COALESCE($1, status), resultado = COALESCE($2, resultado), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
+      "UPDATE execucoes SET status = COALESCE($1, status), resultado = COALESCE($2, resultado), updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND deleted_at IS NULL RETURNING *",
       [status || null, resultado || null, id]
     );
-    if (result.rows.length === 0) throw new AppError("Execução não encontrada", 404);
+    if (result.rows.length === 0) throw new AppError("Execu\u00e7\u00e3o n\u00e3o encontrada", 404);
     return result.rows[0];
   },
 
   delete: async (id) => {
-    const result = await query("DELETE FROM execucoes WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) throw new AppError("Execução não encontrada", 404);
+    const result = await query(
+      "UPDATE execucoes SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Execu\u00e7\u00e3o n\u00e3o encontrada", 404);
+    return result.rows[0];
+  },
+
+  restore: async (id) => {
+    const result = await query(
+      "UPDATE execucoes SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *",
+      [id]
+    );
+    if (result.rows.length === 0) throw new AppError("Execu\u00e7\u00e3o n\u00e3o encontrada ou n\u00e3o est\u00e1 deletada", 404);
     return result.rows[0];
   },
 
