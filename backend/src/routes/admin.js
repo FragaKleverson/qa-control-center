@@ -10,6 +10,7 @@ const express = require("express");
 const router = express.Router();
 const { z } = require("zod");
 const authService = require("../services/authService");
+const { listAuditLogs } = require("../services/auditService");
 const { authorize } = require("../middleware/authorize");
 const { validate } = require("../middleware/validate");
 const { idParamSchema } = require("../validators/common");
@@ -135,5 +136,39 @@ router.delete(
     }
   }
 );
+
+/**
+ * @swagger
+ * /admin/audit-log:
+ *   get:
+ *     summary: Listar entradas do audit log
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: query, name: entity_type, schema: { type: string } }
+ *       - { in: query, name: entity_id,   schema: { type: integer } }
+ *       - { in: query, name: user_id,     schema: { type: integer } }
+ *       - { in: query, name: action,      schema: { type: string, enum: [CREATE, UPDATE, DELETE] } }
+ *       - { in: query, name: from,        schema: { type: string, format: date-time } }
+ *       - { in: query, name: to,          schema: { type: string, format: date-time } }
+ *       - { in: query, name: page,        schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit,       schema: { type: integer, default: 20 } }
+ *     responses:
+ *       200:
+ *         description: Lista paginada de audit logs
+ *       403:
+ *         description: Acesso negado — requer role admin
+ */
+router.get("/audit-log", async (req, res, next) => {
+  try {
+    const { entity_type, entity_id, user_id, action, from, to, page, limit } = req.query;
+    const result = await listAuditLogs({ entityType: entity_type, entityId: entity_id, userId: user_id, action, from, to, page, limit });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

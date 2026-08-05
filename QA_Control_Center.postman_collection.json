@@ -370,6 +370,90 @@
           }
         }
       ]
+    },
+    {
+      "name": "Administração",
+      "description": "Endpoints exclusivos para role admin — gestão de usuários e audit log.",
+      "item": [
+        {
+          "name": "Listar Usuários",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "usuarios"]
+            }
+          }
+        },
+        {
+          "name": "Alterar Role de Usuário",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"qa\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{user_id}}/role",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "usuarios", "{{user_id}}", "role"]
+            }
+          }
+        },
+        {
+          "name": "Remover Usuário",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/usuarios/{{user_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "usuarios", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Listar Audit Log",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{jwt_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-log",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit-log"],
+              "query": [
+                { "key": "entity_type", "value": "projeto",    "disabled": true, "description": "projeto | test_suite | requirement | execucao | test_plan" },
+                { "key": "entity_id",   "value": "1",          "disabled": true, "description": "ID da entidade" },
+                { "key": "user_id",     "value": "1",          "disabled": true, "description": "ID do usuário que fez a ação" },
+                { "key": "action",      "value": "CREATE",     "disabled": true, "description": "CREATE | UPDATE | DELETE" },
+                { "key": "from",        "value": "2026-01-01T00:00:00Z", "disabled": true, "description": "Data/hora inicial (ISO 8601)" },
+                { "key": "to",          "value": "2026-12-31T23:59:59Z", "disabled": true, "description": "Data/hora final (ISO 8601)" },
+                { "key": "page",        "value": "1",          "disabled": true },
+                { "key": "limit",       "value": "20",         "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -390,6 +474,12 @@
       "value": "",
       "type": "string",
       "description": " JWT extraído automaticamente após Login"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string",
+      "description": "ID do usuário para endpoints de admin (Alterar Role, Remover)"
     }
   ]
 }

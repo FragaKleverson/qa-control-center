@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { testPlansService } = require("../services");
+const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
 const { idParamSchema, idAndSuiteIdSchema } = require("../validators/common");
@@ -31,6 +32,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const plan = await testPlansService.create(req.body);
+    await logAudit({ userId: req.user?.id, entityType: "test_plan", entityId: plan.id, action: "CREATE", newValues: plan, ipAddress: req.ip });
     res.status(201).json(plan);
   } catch (err) {
     next(err);
@@ -40,7 +42,9 @@ router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, r
 // PUT - Atualizar test plan
 router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
+    const old = await testPlansService.getById(req.params.id);
     const plan = await testPlansService.update(req.params.id, req.body);
+    await logAudit({ userId: req.user?.id, entityType: "test_plan", entityId: plan.id, action: "UPDATE", oldValues: old, newValues: plan, ipAddress: req.ip });
     res.json(plan);
   } catch (err) {
     next(err);
@@ -50,7 +54,8 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 // DELETE - Deletar test plan
 router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
-    await testPlansService.delete(req.params.id);
+    const deleted = await testPlansService.delete(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "test_plan", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
     res.json({ message: "Test plan deletado com sucesso" });
   } catch (err) {
     next(err);
