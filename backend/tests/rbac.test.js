@@ -108,6 +108,11 @@ describe("RBAC — Leitor (reader)", () => {
 describe("RBAC — QA", () => {
   const qa = { "x-test-role": "qa" };
 
+  // Garante users.id=1 para FK created_by (mock injeta req.user.id=1)
+  beforeEach(async () => {
+    await createTestUser({ email: "seed@qa.dev", role: "admin" });
+  });
+
   it("GET /projetos → 200", async () => {
     const res = await request(app).get("/projetos").set(qa);
     expect(res.statusCode).toBe(200);
@@ -146,6 +151,11 @@ describe("RBAC — QA", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("RBAC — Administrador", () => {
   const admin = { "x-test-role": "admin" };
+
+  // Garante users.id=1 para FK created_by
+  beforeEach(async () => {
+    await createTestUser({ email: "seed@qa.dev", role: "admin" });
+  });
 
   it("GET /projetos → 200", async () => {
     const res = await request(app).get("/projetos").set(admin);

@@ -90,7 +90,7 @@ router.delete("/:id/suites/:suiteId", authorize("admin", "qa"), validate(idAndSu
 // POST - Executar plan
 router.post("/:id/execute", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(executeSchema), async (req, res, next) => {
   try {
-    const execucao = await testPlansService.execute(req.params.id, req.body.ambiente);
+    const execucao = await testPlansService.execute(req.params.id, req.body.ambiente, req.user?.id ?? null);
     res.status(201).json(execucao);
   } catch (err) {
     next(err);

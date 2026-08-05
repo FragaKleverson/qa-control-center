@@ -40,7 +40,7 @@ router.get("/:id/cases", validate(idParamSchema, "params"), async (req, res, nex
 // POST - Criar novo test suite
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
-    const suite = await testSuitesService.create(req.body);
+    const suite = await testSuitesService.create(req.body, req.user?.id ?? null);
     res.status(201).json(suite);
   } catch (err) {
     next(err);

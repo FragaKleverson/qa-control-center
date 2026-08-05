@@ -105,7 +105,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 // POST - Criar novo projeto
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
-    const projeto = await projectsService.create(req.body);
+    const projeto = await projectsService.create(req.body, req.user?.id ?? null);
     res.status(201).json(projeto);
   } catch (err) {
     next(err);

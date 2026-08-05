@@ -30,7 +30,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 // POST - Criar novo requirement
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
-    const requirement = await requirementsService.create(req.body);
+    const requirement = await requirementsService.create(req.body, req.user?.id ?? null);
     res.status(201).json(requirement);
   } catch (err) {
     next(err);

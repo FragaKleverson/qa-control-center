@@ -17,14 +17,14 @@ const projectsService = {
     return result.rows[0];
   },
 
-  create: async (data) => {
+  create: async (data, userId = null) => {
     const { titulo, descricao, feature, cenarios = [] } = data;
     if (!titulo || !titulo.trim() || !descricao || !descricao.trim() || !feature || !feature.trim()) {
       throw new Error("Título, descrição e feature são obrigatórios");
     }
     const result = await query(
-      "INSERT INTO projetos (titulo, descricao, feature, cenarios) VALUES ($1, $2, $3, $4) RETURNING *",
-      [titulo, descricao, feature, JSON.stringify(cenarios)]
+      "INSERT INTO projetos (titulo, descricao, feature, cenarios, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [titulo, descricao, feature, JSON.stringify(cenarios), userId]
     );
     return result.rows[0];
   },
@@ -58,12 +58,12 @@ const testSuitesService = {
     return result.rows[0];
   },
 
-  create: async (data) => {
+  create: async (data, userId = null) => {
     const { nome, descricao = "", projeto_id = null } = data;
     if (!nome) throw new Error("Nome da suite é obrigatório");
     const result = await query(
-      "INSERT INTO test_suites (nome, descricao, projeto_id) VALUES ($1, $2, $3) RETURNING *",
-      [nome, descricao, projeto_id]
+      "INSERT INTO test_suites (nome, descricao, projeto_id, created_by) VALUES ($1, $2, $3, $4) RETURNING *",
+      [nome, descricao, projeto_id, userId]
     );
     return result.rows[0];
   },
@@ -127,12 +127,12 @@ const requirementsService = {
     return result.rows[0];
   },
 
-  create: async (data) => {
+  create: async (data, userId = null) => {
     const { titulo, descricao = "", status = "Open", prioridade = "Medium" } = data;
     if (!titulo || !titulo.trim()) throw new Error("Título é obrigatório");
     const result = await query(
-      "INSERT INTO requirements (titulo, descricao, status, prioridade) VALUES ($1, $2, $3, $4) RETURNING *",
-      [titulo, descricao, status, prioridade]
+      "INSERT INTO requirements (titulo, descricao, status, prioridade, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [titulo, descricao, status, prioridade, userId]
     );
     return result.rows[0];
   },
@@ -225,7 +225,7 @@ const testPlansService = {
   },
 
   // Cria execução a partir de um plan (popula execution_results com todos os test cases)
-  execute: async (planId, ambiente = "staging") => {
+  execute: async (planId, ambiente = "staging", userId = null) => {
     const plan = await query("SELECT * FROM test_plans WHERE id = $1", [planId]);
     if (plan.rows.length === 0) throw new AppError("Test Plan não encontrado", 404);
 
@@ -236,10 +236,10 @@ const testPlansService = {
     );
     const suiteId = suitesResult.rows[0]?.suite_id || null;
 
-    // Criar execução
+    // Criar execução registrando quem disparou
     const execResult = await query(
-      "INSERT INTO execucoes (suite_id, ambiente, status) VALUES ($1, $2, 'pending') RETURNING *",
-      [suiteId, ambiente]
+      "INSERT INTO execucoes (suite_id, ambiente, status, created_by) VALUES ($1, $2, 'pending', $3) RETURNING *",
+      [suiteId, ambiente, userId]
     );
     const execucao = execResult.rows[0];
 
@@ -291,12 +291,12 @@ const executionsService = {
     return result.rows[0];
   },
 
-  create: async (data) => {
+  create: async (data, userId = null) => {
     const { suite_id, ambiente = "staging", status = "pending", resultado = null } = data;
     if (!suite_id) throw new Error("suite_id é obrigatório");
     const result = await query(
-      "INSERT INTO execucoes (suite_id, ambiente, status, resultado) VALUES ($1, $2, $3, $4) RETURNING *",
-      [suite_id, ambiente, status, resultado]
+      "INSERT INTO execucoes (suite_id, ambiente, status, resultado, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [suite_id, ambiente, status, resultado, userId]
     );
     return result.rows[0];
   },
