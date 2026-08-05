@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { testSuitesService } = require("../services");
+const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
 const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
@@ -41,6 +42,7 @@ router.get("/:id/cases", validate(idParamSchema, "params"), async (req, res, nex
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const suite = await testSuitesService.create(req.body, req.user?.id ?? null);
+    await logAudit({ userId: req.user?.id, entityType: "test_suite", entityId: suite.id, action: "CREATE", newValues: suite, ipAddress: req.ip });
     res.status(201).json(suite);
   } catch (err) {
     next(err);
@@ -50,7 +52,9 @@ router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, r
 // PUT - Atualizar test suite
 router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
+    const old = await testSuitesService.getById(req.params.id);
     const suite = await testSuitesService.update(req.params.id, req.body);
+    await logAudit({ userId: req.user?.id, entityType: "test_suite", entityId: suite.id, action: "UPDATE", oldValues: old, newValues: suite, ipAddress: req.ip });
     res.json(suite);
   } catch (err) {
     next(err);
@@ -60,7 +64,8 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 // DELETE - Deletar test suite
 router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
-    await testSuitesService.delete(req.params.id);
+    const deleted = await testSuitesService.delete(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "test_suite", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
     res.json({ message: "Test suite deletada com sucesso" });
   } catch (err) {
     next(err);

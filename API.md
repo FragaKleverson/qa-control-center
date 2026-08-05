@@ -199,6 +199,8 @@ Faz login e retorna JWT.
 | PUT | `/projetos/:id` | Atualizar |
 | DELETE | `/projetos/:id` | Deletar |
 
+> **Nota:** As respostas de `Projetos`, `Test Suites`, `Requirements` e `Execuções` incluem o campo `created_by` (ID do usuário que criou o registro, ou `null` se criado antes da Fase 3).
+
 ### Test Suites
 
 | Método | Endpoint | Descrição |
@@ -230,6 +232,28 @@ Faz login e retorna JWT.
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/stats` | Dashboard |
+
+### Administração
+
+| Método | Endpoint | Descrição | Role |
+|--------|----------|-----------|------|
+| GET | `/admin/usuarios` | Listar usuários | admin |
+| PATCH | `/admin/usuarios/:id/role` | Alterar role | admin |
+| DELETE | `/admin/usuarios/:id` | Remover usuário | admin |
+| GET | `/admin/audit-log` | Listar audit log | admin |
+
+#### `GET /admin/audit-log` — Parâmetros de Query
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `entity_type` | string | Filtrar por tipo: `projeto`, `test_suite`, `requirement`, `execucao`, `test_plan` |
+| `entity_id` | integer | Filtrar por ID da entidade |
+| `user_id` | integer | Filtrar por usuário que realizou a ação |
+| `action` | string | Filtrar por ação: `CREATE`, `UPDATE`, `DELETE` |
+| `from` | datetime | Data/hora inicial (ISO 8601) |
+| `to` | datetime | Data/hora final (ISO 8601) |
+| `page` | integer | Página (default: 1) |
+| `limit` | integer | Registros por página (default: 20) |
 
 ---
 

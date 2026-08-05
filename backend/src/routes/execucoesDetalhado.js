@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { executionsService } = require("../services");
+const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
 const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
@@ -41,6 +42,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const execution = await executionsService.create(req.body, req.user?.id ?? null);
+    await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: execution.id, action: "CREATE", newValues: execution, ipAddress: req.ip });
     res.status(201).json(execution);
   } catch (err) {
     next(err);
@@ -50,7 +52,9 @@ router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, r
 // PUT - Atualizar execução
 router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
+    const old = await executionsService.getById(req.params.id);
     const execution = await executionsService.update(req.params.id, req.body);
+    await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: execution.id, action: "UPDATE", oldValues: old, newValues: execution, ipAddress: req.ip });
     res.json(execution);
   } catch (err) {
     next(err);
@@ -60,7 +64,8 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 // DELETE - Deletar execução
 router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
-    await executionsService.delete(req.params.id);
+    const deleted = await executionsService.delete(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
     res.json({ message: "Execução deletada com sucesso" });
   } catch (err) {
     next(err);

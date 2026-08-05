@@ -16,7 +16,7 @@ const pool = require("../../src/db");
  */
 async function clearTables() {
   await pool.query(
-    `TRUNCATE TABLE execution_results, execucoes, test_plan_suites, test_suite_cases,
+    `TRUNCATE TABLE audit_logs, execution_results, execucoes, test_plan_suites, test_suite_cases,
      test_plans, test_suites, requirements, projetos
      RESTART IDENTITY CASCADE`
   );

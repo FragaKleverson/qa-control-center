@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { requirementsService } = require("../services");
+const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
 const { idParamSchema } = require("../validators/common");
@@ -31,6 +32,7 @@ router.get("/:id", validate(idParamSchema, "params"), async (req, res, next) => 
 router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, res, next) => {
   try {
     const requirement = await requirementsService.create(req.body, req.user?.id ?? null);
+    await logAudit({ userId: req.user?.id, entityType: "requirement", entityId: requirement.id, action: "CREATE", newValues: requirement, ipAddress: req.ip });
     res.status(201).json(requirement);
   } catch (err) {
     next(err);
@@ -40,7 +42,9 @@ router.post("/", authorize("admin", "qa"), validate(createSchema), async (req, r
 // PUT - Atualizar requirement
 router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(updateSchema), async (req, res, next) => {
   try {
+    const old = await requirementsService.getById(req.params.id);
     const requirement = await requirementsService.update(req.params.id, req.body);
+    await logAudit({ userId: req.user?.id, entityType: "requirement", entityId: requirement.id, action: "UPDATE", oldValues: old, newValues: requirement, ipAddress: req.ip });
     res.json(requirement);
   } catch (err) {
     next(err);
@@ -50,7 +54,8 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 // DELETE - Deletar requirement
 router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
-    await requirementsService.delete(req.params.id);
+    const deleted = await requirementsService.delete(req.params.id);
+    await logAudit({ userId: req.user?.id, entityType: "requirement", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
     res.json({ message: "Requirement deletado com sucesso" });
   } catch (err) {
     next(err);
