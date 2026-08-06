@@ -31,6 +31,7 @@ model Projeto {
   test_suite_cases  TestSuiteCase[]
   execution_results ExecutionResult[]
 
+  @@index([created_by])
   @@map("projetos")
 }
 
@@ -53,6 +54,8 @@ model TestSuite {
   test_suite_cases TestSuiteCase[]
   test_plan_suites TestPlanSuite[]
 
+  @@index([projeto_id])
+  @@index([created_by])
   @@map("test_suites")
 }
 
@@ -71,6 +74,9 @@ model Requirement {
   updated_at DateTime  @default(now())
   deleted_at DateTime?
 
+  @@index([status])
+  @@index([prioridade])
+  @@index([created_by])
   @@map("requirements")
 }
 
@@ -112,6 +118,9 @@ model Execucao {
 
   execution_results ExecutionResult[]
 
+  @@index([suite_id])
+  @@index([status])
+  @@index([created_by])
   @@map("execucoes")
 }
 
@@ -154,6 +163,8 @@ model ExecutionResult {
   updated_at  DateTime @default(now())
 
   @@unique([execucao_id, projeto_id])
+  @@index([execucao_id])
+  @@index([status])
   @@map("execution_results")
 }
 
@@ -190,6 +201,9 @@ model PasswordResetToken {
   used_at    DateTime? @db.Timestamptz
   created_at DateTime  @default(now()) @db.Timestamptz
 
+  @@index([token_hash])
+  @@index([user_id])
+  @@index([expires_at])
   @@map("password_reset_tokens")
 }
 
