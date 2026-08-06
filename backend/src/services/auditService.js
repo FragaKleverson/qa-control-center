@@ -15,7 +15,7 @@ const pool = require("../db");
  * @param {number|null} opts.userId
  * @param {string}      opts.entityType  — 'projeto' | 'test_suite' | 'requirement' | 'execucao' | 'test_plan'
  * @param {number|null} opts.entityId
- * @param {string}      opts.action      — 'CREATE' | 'UPDATE' | 'DELETE'
+ * @param {string}      opts.action      — 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE'
  * @param {object|null} opts.oldValues
  * @param {object|null} opts.newValues
  * @param {string|null} opts.ipAddress
