@@ -17,6 +17,7 @@ const execucoesDetalhado = require("./routes/execucoesDetalhado");
 const relatorios = require("./routes/relatorios");
 const authRoutes = require("./routes/auth");
 const adminRoutes = require("./routes/admin");
+const healthRoutes = require("./routes/health");
 const authMiddleware = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -60,6 +61,13 @@ app.use(
 app.get("/openapi.json", (req, res) => {
   res.json(swaggerSpec);
 });
+
+/* =========================
+   HEALTH CHECK
+   Publico, sem autenticacao e sem rate limit — usado por orquestradores
+   (Docker/Kubernetes) e monitoramento externo para liveness/readiness.
+========================= */
+app.use("/health", healthRoutes);
 
 /* =========================
    SEGURANÇA — HTTP HEADERS
