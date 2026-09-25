@@ -30,4 +30,12 @@ const idAndSuiteIdSchema = z.object({
     .regex(/^\d+$/, "suiteId deve ser um número inteiro positivo"),
 });
 
-module.exports = { idParamSchema, idAndProjetoIdSchema, idAndSuiteIdSchema };
+// Valida query params de paginação — Fase 4, item 12.
+// Ambos opcionais: se ausentes, a rota retorna a lista completa (comportamento
+// anterior preservado). Se informados, a resposta vira { data, total, page, limit }.
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+module.exports = { idParamSchema, idAndProjetoIdSchema, idAndSuiteIdSchema, paginationQuerySchema };

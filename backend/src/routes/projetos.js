@@ -4,7 +4,7 @@ const { projectsService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema } = require("../validators/common");
+const { idParamSchema, paginationQuerySchema } = require("../validators/common");
 const { createSchema, updateSchema } = require("../validators/projetos");
 
 /**
@@ -35,10 +35,10 @@ const { createSchema, updateSchema } = require("../validators/projetos");
  *       401:
  *         description: Sem token de autenticação
  */
-// GET - Listar todos os projetos
-router.get("/", async (req, res, next) => {
+// GET - Listar todos os projetos (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const projetos = await projectsService.listAll();
+    const projetos = await projectsService.listAll(req.query);
     res.json(projetos);
   } catch (err) {
     next(err);

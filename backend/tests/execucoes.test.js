@@ -69,6 +69,42 @@ describe("Execuções API - Suite completa", () => {
     });
 
     // =====================================================
+    // GET /execucoes — Paginação (Fase 4, item 12)
+    // =====================================================
+    describe("GET /execucoes?page=&limit=", () => {
+
+        it("sem page/limit continua retornando array simples (compatibilidade)", async () => {
+            const suite = await createSuite();
+            await createExecucao(suite.id);
+            await createExecucao(suite.id);
+
+            const res = await request(app).get("/execucoes");
+            expect(Array.isArray(res.body)).toBe(true);
+            expect(res.body).toHaveLength(2);
+        });
+
+        it("com page/limit retorna envelope { data, total, page, limit }", async () => {
+            const suite = await createSuite();
+            for (let i = 0; i < 3; i++) await createExecucao(suite.id);
+
+            const res = await request(app).get("/execucoes?page=1&limit=2");
+            expect(res.statusCode).toBe(200);
+            expect(res.body).toHaveProperty("data");
+            expect(res.body).toHaveProperty("total", 3);
+            expect(res.body).toHaveProperty("page", 1);
+            expect(res.body).toHaveProperty("limit", 2);
+            expect(res.body.data).toHaveLength(2);
+            expect(res.body.data[0]).toHaveProperty("total_cases");
+        });
+
+        it("deve rejeitar page/limit inválidos com 422", async () => {
+            const res = await request(app).get("/execucoes?page=-1");
+            expect(res.statusCode).toBe(422);
+        });
+
+    });
+
+    // =====================================================
     // GET /execucoes/:id
     // =====================================================
     describe("GET /execucoes/:id", () => {

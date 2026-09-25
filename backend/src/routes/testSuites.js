@@ -4,13 +4,13 @@ const { testSuitesService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
+const { idParamSchema, idAndProjetoIdSchema, paginationQuerySchema } = require("../validators/common");
 const { createSchema, updateSchema, addCaseSchema } = require("../validators/testSuites");
 
-// GET - Listar todos os test suites
-router.get("/", async (req, res, next) => {
+// GET - Listar todos os test suites (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const suites = await testSuitesService.listAll();
+    const suites = await testSuitesService.listAll(req.query);
     res.json(suites);
   } catch (err) {
     next(err);
