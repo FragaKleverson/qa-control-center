@@ -191,7 +191,7 @@ Melhorar integridade e performance.
 
 # FASE 4 - ESCALABILIDADE
 
-## 12. Paginação
+## 12. Paginação ✅
 
 ### Aplicar em
 
@@ -206,7 +206,7 @@ Preparação para grande volume de dados.
 
 ---
 
-## 13. Refatoração da Service Layer
+## 13. Refatoração da Service Layer ✅
 
 ### Objetivo
 
@@ -220,7 +220,7 @@ Separar regras de negócio do acesso ao banco.
 
 ---
 
-## 14. Health Checks
+## 14. Health Checks ✅
 
 ### Implementar
 
@@ -230,7 +230,7 @@ Separar regras de negócio do acesso ao banco.
 
 ---
 
-## 15. Docker para Produção
+## 15. Docker para Produção ✅
 
 ### Atividades
 
@@ -249,6 +249,8 @@ Separar regras de negócio do acesso ao banco.
 * Unitários
 * Integração
 * Cobertura mínima
+* Teste Carga / Performace
+* Testes de segurança 
 
 ---
 
@@ -259,6 +261,7 @@ Separar regras de negócio do acesso ao banco.
 * Componentes
 * Fluxos críticos
 * Teste Carga / Performace 
+* Testes de segurança
 
 ---
 
@@ -270,6 +273,8 @@ Separar regras de negócio do acesso ao banco.
 * Cadastro
 * Projetos
 * Execuções
+* Teste Carga / Performace
+* Testes de segurança
 
 ---
 
