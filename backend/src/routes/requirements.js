@@ -4,13 +4,13 @@ const { requirementsService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema } = require("../validators/common");
+const { idParamSchema, paginationQuerySchema } = require("../validators/common");
 const { createSchema, updateSchema } = require("../validators/requirements");
 
-// GET - Listar todos os requirements
-router.get("/", async (req, res, next) => {
+// GET - Listar todos os requirements (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const requirements = await requirementsService.listAll();
+    const requirements = await requirementsService.listAll(req.query);
     res.json(requirements);
   } catch (err) {
     next(err);

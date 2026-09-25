@@ -72,6 +72,55 @@ describe("Projetos API - Suite completa", () => {
     });
 
     // =====================================================
+    // GET /projetos — Paginação (Fase 4, item 12)
+    // =====================================================
+    describe("GET /projetos?page=&limit=", () => {
+
+        it("sem page/limit continua retornando array simples (compatibilidade)", async () => {
+            await createProjeto({ titulo: "A" });
+            await createProjeto({ titulo: "B" });
+
+            const res = await request(app).get("/projetos");
+            expect(res.statusCode).toBe(200);
+            expect(Array.isArray(res.body)).toBe(true);
+            expect(res.body).toHaveLength(2);
+        });
+
+        it("com page/limit retorna envelope { data, total, page, limit }", async () => {
+            for (let i = 0; i < 5; i++) await createProjeto({ titulo: `Projeto ${i}` });
+
+            const res = await request(app).get("/projetos?page=1&limit=2");
+            expect(res.statusCode).toBe(200);
+            expect(Array.isArray(res.body)).toBe(false);
+            expect(res.body).toHaveProperty("data");
+            expect(res.body).toHaveProperty("total", 5);
+            expect(res.body).toHaveProperty("page", 1);
+            expect(res.body).toHaveProperty("limit", 2);
+            expect(res.body.data).toHaveLength(2);
+        });
+
+        it("deve navegar para a segunda página corretamente", async () => {
+            for (let i = 0; i < 3; i++) await createProjeto({ titulo: `Projeto ${i}` });
+
+            const res = await request(app).get("/projetos?page=2&limit=2");
+            expect(res.statusCode).toBe(200);
+            expect(res.body.page).toBe(2);
+            expect(res.body.data).toHaveLength(1);
+        });
+
+        it("deve rejeitar page/limit inválidos com 422", async () => {
+            const res = await request(app).get("/projetos?page=0&limit=abc");
+            expect(res.statusCode).toBe(422);
+        });
+
+        it("deve rejeitar limit acima do máximo permitido", async () => {
+            const res = await request(app).get("/projetos?limit=101");
+            expect(res.statusCode).toBe(422);
+        });
+
+    });
+
+    // =====================================================
     // GET /projetos/:id
     // =====================================================
     describe("GET /projetos/:id", () => {

@@ -64,6 +64,43 @@ describe("Relatórios e Stats - Suite completa", () => {
     });
 
     // =====================================================
+    // GET /relatorios — Paginação (Fase 4, item 12)
+    // =====================================================
+    describe("GET /relatorios?page=&limit=", () => {
+
+        it("sem page/limit, executions continua sendo array simples (compatibilidade)", async () => {
+            const suite = await createSuite();
+            await pool.query(
+                "INSERT INTO execucoes (suite_id, ambiente, status) VALUES ($1, 'staging', 'passed')",
+                [suite.id]
+            );
+
+            const res = await request(app).get("/relatorios");
+            expect(Array.isArray(res.body.executions)).toBe(true);
+        });
+
+        it("com page/limit, executions vira envelope { data, total, page, limit }", async () => {
+            const suite = await createSuite();
+            for (let i = 0; i < 3; i++) {
+                await pool.query(
+                    "INSERT INTO execucoes (suite_id, ambiente, status) VALUES ($1, 'staging', 'passed')",
+                    [suite.id]
+                );
+            }
+
+            const res = await request(app).get("/relatorios?page=1&limit=2");
+            expect(res.statusCode).toBe(200);
+            expect(res.body.executions).toHaveProperty("data");
+            expect(res.body.executions).toHaveProperty("total", 3);
+            expect(res.body.executions.data).toHaveLength(2);
+            // stats e suiteStats continuam intactos independente da paginação
+            expect(res.body).toHaveProperty("stats");
+            expect(res.body).toHaveProperty("suiteStats");
+        });
+
+    });
+
+    // =====================================================
     // GET /stats
     // =====================================================
     describe("GET /stats", () => {

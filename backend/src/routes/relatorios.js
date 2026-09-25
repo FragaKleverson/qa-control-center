@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const { reportsService } = require("../services");
 const { authorize } = require("../middleware/authorize");
+const { validate } = require("../middleware/validate");
+const { paginationQuerySchema } = require("../validators/common");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 
-// GET - Listar todos os relatórios/execuções
-router.get("/", async (req, res, next) => {
+// GET - Listar todos os relatórios/execuções (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const reports = await reportsService.listAll();
+    const reports = await reportsService.listAll(req.query);
     res.json(reports);
   } catch (err) {
     next(err);

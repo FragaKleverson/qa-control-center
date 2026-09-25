@@ -4,13 +4,13 @@ const { executionsService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
+const { idParamSchema, idAndProjetoIdSchema, paginationQuerySchema } = require("../validators/common");
 const { createSchema, updateSchema, updateResultSchema } = require("../validators/execucoes");
 
-// GET - Listar todas as execuções
-router.get("/", async (req, res, next) => {
+// GET - Listar todas as execuções (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const executions = await executionsService.listAll();
+    const executions = await executionsService.listAll(req.query);
     res.json(executions);
   } catch (err) {
     next(err);

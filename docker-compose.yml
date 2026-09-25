@@ -15,6 +15,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   db-test:
     image: postgres:15
@@ -29,13 +35,20 @@ services:
     volumes:
       - pgdata-test:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB_TEST:-qa_control_test}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   backend:
     build: ./backend
     container_name: qa-backend
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -47,9 +60,14 @@ services:
       REGISTER_TOKEN: ${REGISTER_TOKEN}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
+    # HEALTHCHECK definido no Dockerfile (GET /health) é herdado automaticamente
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Modo desenvolvimento (hot reload) — para build de produção via Nginx,
+      # use docker-compose.prod.yml (target: production).
+      target: dev
     container_name: qa-frontend
     restart: always
     depends_on:

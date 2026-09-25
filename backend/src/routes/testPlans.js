@@ -4,13 +4,13 @@ const { testPlansService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema, idAndSuiteIdSchema } = require("../validators/common");
+const { idParamSchema, idAndSuiteIdSchema, paginationQuerySchema } = require("../validators/common");
 const { createSchema, updateSchema, addSuiteSchema, executeSchema } = require("../validators/testPlans");
 
-// GET - Listar todos os test plans
-router.get("/", async (req, res, next) => {
+// GET - Listar todos os test plans (opcionalmente paginado via ?page=&limit=)
+router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
   try {
-    const plans = await testPlansService.listAll();
+    const plans = await testPlansService.listAll(req.query);
     res.json(plans);
   } catch (err) {
     next(err);
