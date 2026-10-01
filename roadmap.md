@@ -246,11 +246,11 @@ Separar regras de negócio do acesso ao banco.
 
 ### Implementar
 
-* Unitários
-* Integração
-* Cobertura mínima
-* Teste Carga / Performace
-* Testes de segurança 
+* Unitários ✅
+* Integração ✅
+* Cobertura mínima ✅
+* Teste Carga / Performace (pendente — adiado a pedido)
+* Testes de segurança ✅
 
 ---
 
