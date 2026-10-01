@@ -13,6 +13,17 @@ module.exports = {
     "!src/init-db.js",  // script avulso de inicialização
     "!src/generator.js" // gerador de doc Word (sem rota ativa)
   ],
+  // Cobertura mínima (Fase 5, item 16) — piso abaixo da cobertura atual
+  // (~72/56/70/75%), para travar regressões sem bloquear o dia a dia.
+  // Reavaliar para cima conforme novos testes forem adicionados.
+  coverageThreshold: {
+    global: {
+      statements: 70,
+      branches: 50,
+      functions: 65,
+      lines: 70,
+    },
+  },
   // Timeout por teste (integração com banco pode ser mais lento)
   testTimeout: 15000,
 };
