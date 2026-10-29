@@ -15,12 +15,12 @@ const reportsService = {
 
     const executions = paginationRequested
       ? await paginate(query, {
-          baseSql: "SELECT * FROM execucoes ORDER BY created_at DESC",
+          baseSql: "SELECT * FROM execucoes ORDER BY created_at DESC, id DESC",
           countSql: "SELECT COUNT(*) FROM execucoes",
           page,
           limit,
         })
-      : (await query("SELECT * FROM execucoes ORDER BY created_at DESC LIMIT 100")).rows;
+      : (await query("SELECT * FROM execucoes ORDER BY created_at DESC, id DESC LIMIT 100")).rows;
 
     const stats = await query(
       `SELECT status, COUNT(*) as count FROM execucoes GROUP BY status`

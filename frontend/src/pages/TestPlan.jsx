@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { testPlansAPI, testSuitesAPI } from "../services/api";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
+import { testPlansAPI, testSuitesAPI, parsePaginationResponse } from "../services/api";
 import "./Pages.css";
 
 export default function TestPlan() {
-  const [plans, setPlans] = useState([]);
+  const {
+    data: plans, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadPlans, mounted,
+  } = usePaginatedList(testPlansAPI.list);
   const [allSuites, setAllSuites] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuitesModalOpen, setIsSuitesModalOpen] = useState(false);
@@ -21,37 +26,27 @@ export default function TestPlan() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
   useEffect(() => {
-    loadPlans();
-    loadAllSuites();
+    const controller = new AbortController();
+    testSuitesAPI.list(undefined, { signal: controller.signal })
+      .then(parsePaginationResponse)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setAllSuites(data);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error(err);
+      });
+    return () => controller.abort();
   }, []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  // Busca todos os test plans da API
-  async function loadPlans() {
-    try {
-      const data = await testPlansAPI.list();
-      setPlans(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar test plans", "error");
-    }
-  }
-
-  // Busca todas as suites para exibir no modal de vínculo
-  async function loadAllSuites() {
-    try {
-      const data = await testSuitesAPI.list();
-      setAllSuites(data);
-    } catch (err) {
-      console.error(err);
-    }
   }
 
   // Abre o modal de gestão de suites de um plan e carrega as vinculadas
@@ -60,8 +55,10 @@ export default function TestPlan() {
     setIsSuitesModalOpen(true);
     try {
       const suites = await testPlansAPI.getSuites(plan.id);
-      setPlanSuites(suites);
+      if (!mounted.current) return;
+      setPlanSuites(parsePaginationResponse(suites).data);
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao carregar suites do plan", "error");
     }
@@ -71,10 +68,13 @@ export default function TestPlan() {
   async function handleAddSuite(suiteId) {
     try {
       await testPlansAPI.addSuite(selectedPlan.id, suiteId);
+      if (!mounted.current) return;
       const suites = await testPlansAPI.getSuites(selectedPlan.id);
-      setPlanSuites(suites);
+      if (!mounted.current) return;
+      setPlanSuites(parsePaginationResponse(suites).data);
       showToast("Suite adicionada ao plan!", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao adicionar suite", "error");
     }
@@ -84,10 +84,13 @@ export default function TestPlan() {
   async function handleRemoveSuite(suiteId) {
     try {
       await testPlansAPI.removeSuite(selectedPlan.id, suiteId);
+      if (!mounted.current) return;
       const suites = await testPlansAPI.getSuites(selectedPlan.id);
-      setPlanSuites(suites);
+      if (!mounted.current) return;
+      setPlanSuites(parsePaginationResponse(suites).data);
       showToast("Suite removida do plan", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao remover suite", "error");
     }
@@ -104,13 +107,15 @@ export default function TestPlan() {
     setExecuting(true);
     try {
       const exec = await testPlansAPI.execute(plan.id, ambiente);
+      if (!mounted.current) return;
       if (exec.error) throw new Error(exec.error);
       showToast(`Execução #${exec.id} criada! Vá para Executions para acompanhar.`, "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao executar plan: " + err.message, "error");
     } finally {
-      setExecuting(false);
+      if (mounted.current) setExecuting(false);
     }
   }
 
@@ -125,16 +130,18 @@ export default function TestPlan() {
     }
     try {
       const res = await testPlansAPI.create(formData);
+      if (!mounted.current) return;
       if (!res.id) { showToast("Erro ao criar plan", "error"); setLoading(false); return; }
       showToast("Test Plan criado com sucesso!", "success");
       setFormData({ titulo: "", descricao: "", escopo: "", objetivo: "", ambiente: "" });
       setIsModalOpen(false);
       loadPlans();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao criar test plan", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -148,9 +155,11 @@ export default function TestPlan() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await testPlansAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Test Plan deletado", "success");
           loadPlans();
         } catch (err) {
+          if (!mounted.current) return;
           console.error(err);
           showToast("Erro ao deletar test plan", "error");
         }
@@ -178,8 +187,17 @@ export default function TestPlan() {
         </div>
 
         <div className="card">
-          <h2>Your Test Plans ({plans.length})</h2>
-          {plans.length === 0 ? (
+          <h2>Your Test Plans ({isLoading || listError ? "..." : total})</h2>
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadPlans}>Tentar novamente</button>
+            </div>
+          ) : plans.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : plans.length === 0 ? (
             <p>No test plans created yet. Create one to get started!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
@@ -219,6 +237,17 @@ export default function TestPlan() {
               ))}
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={plans.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 

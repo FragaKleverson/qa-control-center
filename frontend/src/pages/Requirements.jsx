@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
 import { requirementsAPI } from "../services/api";
 import "./Pages.css";
 
 export default function Requirements() {
-  const [requirements, setRequirements] = useState([]);
+  const {
+    data: requirements, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadRequirements, mounted,
+  } = usePaginatedList(requirementsAPI.list);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -18,12 +23,11 @@ export default function Requirements() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
-  useEffect(() => {
-    loadRequirements();
-  }, []);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -31,17 +35,6 @@ export default function Requirements() {
     toastTimerRef.current = setTimeout(() => {
       setToast({ message: "", type: "" });
     }, 3000);
-  }
-
-  // Busca todos os requirements da API
-  async function loadRequirements() {
-    try {
-      const data = await requirementsAPI.list();
-      setRequirements(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar requirements", "error");
-    }
   }
 
   // Cria um novo requirement via API; valida campo título
@@ -57,9 +50,11 @@ export default function Requirements() {
 
     try {
       const res = await requirementsAPI.create(formData);
+      if (!mounted.current) return;
 
       if (!res.id) {
         showToast(await res.text(), "error");
+        if (!mounted.current) return;
         setLoading(false);
         return;
       }
@@ -69,10 +64,11 @@ export default function Requirements() {
       setIsModalOpen(false);
       loadRequirements();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao criar requirement", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -86,9 +82,11 @@ export default function Requirements() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await requirementsAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Requirement deletado", "success");
           loadRequirements();
         } catch (err) {
+          if (!mounted.current) return;
           console.error(err);
           showToast("Erro ao deletar requirement", "error");
         }
@@ -127,8 +125,17 @@ export default function Requirements() {
         </div>
 
         <div className="card">
-          <h2>Your Requirements ({requirements.length})</h2>
-          {requirements.length === 0 ? (
+          <h2>Your Requirements ({isLoading || listError ? "..." : total})</h2>
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadRequirements}>Tentar novamente</button>
+            </div>
+          ) : requirements.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : requirements.length === 0 ? (
             <p>No requirements created yet.</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
@@ -172,6 +179,17 @@ export default function Requirements() {
               ))}
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={requirements.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 

@@ -21,17 +21,24 @@ const BASE_SQL = `SELECT e.*,
    FROM execucoes e
    LEFT JOIN test_suites ts ON ts.id = e.suite_id
    LEFT JOIN projetos p ON p.id = ts.projeto_id
-   WHERE e.deleted_at IS NULL
-   ORDER BY e.created_at DESC`;
+   WHERE e.deleted_at IS NULL`;
 const COUNT_SQL = "SELECT COUNT(*) FROM execucoes e WHERE e.deleted_at IS NULL";
 
 const executionsService = {
-  listAll: async ({ page, limit } = {}) => {
+  listAll: async ({ page, limit, projeto_id } = {}) => {
+    const params = projeto_id === undefined ? [] : [projeto_id];
+    const filter = params.length ? " AND ts.projeto_id = $1" : "";
+    const baseSql = `${BASE_SQL}${filter} ORDER BY e.created_at DESC, e.id DESC`;
+    const countSql = params.length
+      ? `SELECT COUNT(*) FROM execucoes e
+         LEFT JOIN test_suites ts ON ts.id = e.suite_id
+         WHERE e.deleted_at IS NULL${filter}`
+      : COUNT_SQL;
     if (!isPaginationRequested({ page, limit })) {
-      const result = await query(BASE_SQL);
+      const result = await query(baseSql, params);
       return result.rows;
     }
-    return paginate(query, { baseSql: BASE_SQL, countSql: COUNT_SQL, page, limit });
+    return paginate(query, { baseSql, countSql, page, limit, params });
   },
 
   getById: async (id) => {

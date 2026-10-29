@@ -24,15 +24,16 @@ function isPaginationRequested({ page, limit } = {}) {
  * @param {string} opts.countSql - SELECT COUNT(*) equivalente ao baseSql (mesmo WHERE)
  * @param {number} [opts.page]
  * @param {number} [opts.limit]
+ * @param {Array} [opts.params] - Parâmetros compartilhados pelo SELECT e COUNT.
  */
-async function paginate(query, { baseSql, countSql, page, limit }) {
+async function paginate(query, { baseSql, countSql, page, limit, params = [] }) {
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);
   const offset = (pageNum - 1) * limitNum;
 
   const [rows, count] = await Promise.all([
-    query(`${baseSql} LIMIT $1 OFFSET $2`, [limitNum, offset]),
-    query(countSql),
+    query(`${baseSql} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limitNum, offset]),
+    params.length ? query(countSql, params) : query(countSql),
   ]);
 
   return {

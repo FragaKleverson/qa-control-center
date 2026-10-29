@@ -8,16 +8,25 @@ const { paginate, isPaginationRequested } = require("./pagination");
 
 const query = (sql, params) => pool.query(sql, params);
 
-const BASE_SQL = "SELECT * FROM projetos WHERE deleted_at IS NULL ORDER BY created_at DESC";
+const BASE_SQL = "SELECT * FROM projetos WHERE deleted_at IS NULL";
 const COUNT_SQL = "SELECT COUNT(*) FROM projetos WHERE deleted_at IS NULL";
+const SORT_FIELDS = new Map([["id", "id"], ["created_at", "created_at"]]);
+const SORT_DIRECTIONS = new Map([["asc", "ASC"], ["desc", "DESC"]]);
 
 const projectsService = {
-  listAll: async ({ page, limit } = {}) => {
+  listAll: async ({ page, limit, sort_by = "created_at", sort_dir = "desc" } = {}) => {
+    if (!SORT_FIELDS.has(sort_by) || !SORT_DIRECTIONS.has(sort_dir)) {
+      throw new AppError("Ordenação inválida", 422);
+    }
+    const field = SORT_FIELDS.get(sort_by);
+    const direction = SORT_DIRECTIONS.get(sort_dir);
+    const orderBy = field === "id" ? `id ${direction}` : `${field} ${direction}, id ${direction}`;
+    const baseSql = `${BASE_SQL} ORDER BY ${orderBy}`;
     if (!isPaginationRequested({ page, limit })) {
-      const result = await query(BASE_SQL);
+      const result = await query(baseSql);
       return result.rows;
     }
-    return paginate(query, { baseSql: BASE_SQL, countSql: COUNT_SQL, page, limit });
+    return paginate(query, { baseSql, countSql: COUNT_SQL, page, limit });
   },
 
   getById: async (id) => {

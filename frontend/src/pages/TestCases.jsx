@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { useAuth } from "../contexts/AuthContext";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
 import { projectsAPI } from "../services/api";
 import "./Pages.css";
 
@@ -47,8 +51,17 @@ const tdStyle = {
 };
 
 export default function TestCases() {
-  const [testCases, setTestCases] = useState([]);
-  const [sortAsc, setSortAsc] = useState(false);
+  const { user } = useAuth();
+  const canDelete = user?.role === "admin";
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const deletePending = useRef(false);
+  const {
+    data: testCases, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadTestCases, mounted,
+    query, setQuery,
+  } = usePaginatedList(projectsAPI.list, { sort_by: "id", sort_dir: "desc" });
+  const sortAsc = query.sort_dir === "asc";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -57,24 +70,14 @@ export default function TestCases() {
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
 
-  useEffect(() => { loadTestCases(); }, []);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  // Busca todos os test cases da API e atualiza a lista
-  async function loadTestCases() {
-    try {
-      const data = await projectsAPI.list();
-      setTestCases(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar test cases", "error");
-    }
   }
 
   // Abre o modal de visualização read-only de um test case
@@ -126,36 +129,72 @@ export default function TestCases() {
     try {
       if (editingId) {
         await projectsAPI.update(editingId, doc);
+        if (!mounted.current) return;
         showToast("Atualizado com sucesso", "success");
       } else {
         await projectsAPI.create(doc);
+        if (!mounted.current) return;
         showToast("Salvo com sucesso", "success");
       }
       setIsModalOpen(false);
       loadTestCases();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro na API", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
-  const sorted = [...testCases].sort((a, b) => sortAsc ? a.id - b.id : b.id - a.id);
+  async function deleteTestCase() {
+    if (!canDelete || !deleteTarget || deletePending.current) return;
+    const id = deleteTarget.id;
+    deletePending.current = true;
+    setDeletingId(id);
+    setDeleteTarget(null);
+    try {
+      await projectsAPI.delete(id);
+      if (!mounted.current) return;
+      setViewingTC((current) => current?.id === id ? null : current);
+      showToast("Test case excluído com sucesso", "success");
+      loadTestCases();
+    } catch (err) {
+      showToast(err.message || "Erro ao excluir test case", "error");
+    } finally {
+      deletePending.current = false;
+      if (mounted.current) setDeletingId(null);
+    }
+  }
 
   return (
     <div className="page">
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        message={`Excluir ${formatTCId(deleteTarget?.id)}? Este registro também deixará de aparecer em Projects.`}
+        onConfirm={deleteTestCase}
+        onCancel={() => setDeleteTarget(null)}
+      />
       <h1>Test Cases</h1>
       <p>Manage your test cases</p>
 
       <div className="page-content">
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-            <h2 style={{ margin: 0 }}>All Test Cases ({testCases.length})</h2>
+            <h2 style={{ margin: 0 }}>All Test Cases ({isLoading || listError ? "..." : total})</h2>
             <button onClick={openAddModal}>+ New Test Case</button>
           </div>
 
-          {testCases.length === 0 ? (
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadTestCases}>Tentar novamente</button>
+            </div>
+          ) : testCases.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : testCases.length === 0 ? (
             <p style={{ color: "#9ca3af", margin: 0 }}>
               Nenhum test case criado. Clique em &quot;+ New Test Case&quot; para adicionar.
             </p>
@@ -166,7 +205,8 @@ export default function TestCases() {
                   <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
                     <th style={thStyle}>
                       <button
-                        onClick={() => setSortAsc((v) => !v)}
+                        onClick={() => setQuery({ sort_by: "id", sort_dir: sortAsc ? "desc" : "asc" })}
+                        aria-label={`Ordenar por ID ${sortAsc ? "decrescente" : "crescente"}`}
                         style={{
                           background: "none",
                           color: "#374151",
@@ -188,11 +228,11 @@ export default function TestCases() {
                     <th style={thStyle}>Descricao</th>
                     <th style={thStyle}>Feature</th>
                     <th style={thStyle}>Data</th>
-                    <th style={{ ...thStyle, textAlign: "center" }}>Editar</th>
+                    <th style={{ ...thStyle, textAlign: "center" }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((tc) => (
+                  {testCases.map((tc) => (
                     <tr
                       key={tc.id}
                       style={{ borderBottom: "1px solid #f3f4f6", transition: "background 0.1s" }}
@@ -234,6 +274,14 @@ export default function TestCases() {
                         >
                           <PencilIcon />
                         </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeleteTarget(tc)}
+                            disabled={deletingId !== null}
+                            aria-label={`Excluir ${formatTCId(tc.id)}`}
+                            style={{ background: "#ef4444", marginLeft: "8px", padding: "6px 10px" }}
+                          >Excluir</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -241,6 +289,17 @@ export default function TestCases() {
               </table>
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={testCases.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 

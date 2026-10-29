@@ -8,9 +8,35 @@ jest.mock("../../src/db", () => ({ query: jest.fn() }));
 const pool = require("../../src/db");
 const projectsService = require("../../src/services/projectsService");
 const AppError = require("../../src/middleware/AppError");
+const { authorize } = require("../../src/middleware/authorize");
 
 beforeEach(() => {
     pool.query.mockReset();
+});
+
+it("exclui o test case pelo mesmo ID persistido, com soft delete", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 42 }] });
+    expect(await projectsService.delete(42)).toEqual({ id: 42 });
+    expect(pool.query).toHaveBeenCalledWith(
+        "UPDATE projetos SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *", [42]
+    );
+});
+
+it("atualiza o projeto sem alterar seu ID", async () => {
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 42, titulo: "Novo" }] });
+    expect(await projectsService.update(42, { titulo: "Novo" })).toEqual({ id: 42, titulo: "Novo" });
+    expect(pool.query.mock.calls[0][1]).toEqual(["Novo", null, null, 42]);
+});
+
+it.each(["admin", "qa", "reader"])("permissão de exclusão para %s", (role) => {
+    const next = jest.fn();
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    authorize("admin")({ user: { role } }, res, next);
+    if (role === "admin") expect(next).toHaveBeenCalledTimes(1);
+    else {
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(403);
+    }
 });
 
 describe("projectsService.listAll", () => {

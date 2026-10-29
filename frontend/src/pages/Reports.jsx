@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { executionsAPI, reportsAPI, testSuitesAPI } from "../services/api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { executionsAPI, reportsAPI, testSuitesAPI, parsePaginationResponse } from "../services/api";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
 import "./Pages.css";
 
 const STATUS_COLOR = {
@@ -24,7 +26,17 @@ export default function Reports() {
   // Dados gerais
   const [stats, setStats] = useState({ total: 0, passed: 0, failed: 0, pending: 0 });
   const [suiteStats, setSuiteStats] = useState([]);
-  const [recentExecutions, setRecentExecutions] = useState([]);
+  const listHistory = useCallback(async (pagination, options) => {
+    const response = await reportsAPI.list(pagination, options);
+    parsePaginationResponse(response?.executions);
+    if (!Array.isArray(response.suiteStats)) throw new Error("Estatísticas por suíte inválidas");
+    if (!options.signal.aborted) setSuiteStats(response.suiteStats);
+    return response.executions;
+  }, []);
+  const {
+    data: recentExecutions, page, pageSize, total, setPage, setPageSize,
+    isLoading: historyLoading, error: historyError, reload: reloadHistory, mounted,
+  } = usePaginatedList(listHistory);
   const [suites, setSuites] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,35 +49,38 @@ export default function Reports() {
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
 
-  useEffect(() => {
-    loadAll();
-  }, []);
-
-  function showToast(message, type = "info") {
+  const showToast = useCallback((message, type = "info") => {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
+  }, [mounted]);
 
-  async function loadAll() {
-    setLoading(true);
-    try {
-      const [statsData, reportsData, suitesData] = await Promise.all([
-        executionsAPI.getStats(),
-        reportsAPI.list(),
-        testSuitesAPI.list(),
-      ]);
-      setStats(statsData);
-      setRecentExecutions(reportsData.executions || []);
-      setSuiteStats(reportsData.suiteStats || []);
-      setSuites(suitesData);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar relatório", "error");
-    } finally {
-      setLoading(false);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadAuxiliary() {
+      try {
+        const [statsData, suitesData] = await Promise.all([
+          executionsAPI.getStats({ signal: controller.signal }),
+          testSuitesAPI.list(undefined, { signal: controller.signal }),
+        ]);
+        if (controller.signal.aborted) return;
+        if (!statsData || typeof statsData !== "object" || !Array.isArray(suitesData)) {
+          throw new Error("Resposta inválida ao carregar estatísticas e suítes");
+        }
+        setStats(statsData);
+        setSuites(suitesData);
+      } catch (err) {
+        if (!controller.signal.aborted) showToast(err.message, "error");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
-  }
+    loadAuxiliary();
+    return () => controller.abort();
+  }, [showToast]);
 
   async function handleGenerate(e) {
     e.preventDefault();
@@ -373,8 +388,12 @@ export default function Reports() {
 
           {/* ── Histórico recente ────────────────────────── */}
           <div className="card">
-            <h2>Histórico Recente</h2>
-            {recentExecutions.length === 0 ? (
+            <h2>Histórico Recente ({historyLoading ? "…" : total})</h2>
+            {historyLoading ? <p role="status">Carregando histórico...</p> : historyError ? (
+              <div role="alert">{historyError}<button onClick={reloadHistory}>Tentar novamente</button></div>
+            ) : recentExecutions.length === 0 && total > 0 ? (
+              <p>Esta página está temporariamente sem registros.</p>
+            ) : recentExecutions.length === 0 ? (
               <p style={{ color: "#9ca3af" }}>Nenhuma execução registrada ainda</p>
             ) : (
               <div style={{ overflowX: "auto", marginTop: "14px" }}>
@@ -400,8 +419,10 @@ export default function Reports() {
                 </table>
               </div>
             )}
+            <Pagination loading={historyLoading} error={Boolean(historyError)} empty={recentExecutions.length === 0}
+              page={page} pageSize={pageSize} total={total}
+              onPageChange={setPage} onPageSizeChange={setPageSize} />
           </div>
-
         </div>
       )}
 

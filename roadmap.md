@@ -195,10 +195,26 @@ Melhorar integridade e performance.
 
 ### Aplicar em
 
-* Projetos
-* Casos de Teste
-* Execuções
-* Relatórios
+* [x] Projects (Projetos)
+* [x] Test Cases (Casos de Teste)
+* [x] Executions (Execuções)
+* [x] Requirements
+* [x] Test Plan
+* [x] Test Suites
+* [x] Histórico de execuções de Reports (Relatórios)
+
+### Entrega e homologação da paginação — 29/10/2026
+
+* [x] Integração frontend/backend das sete listagens, com Pagination.jsx e usePaginatedList.js.
+* [x] Seleção de 20, 50 ou 100 registros por página, contagem total e navegação.
+* [x] Loading, erro, retry, listas vazias, proteção contra respostas obsoletas e ajuste de página após exclusões.
+* [x] Filtro global por projeto em Executions e ordenação global em Test Cases, aplicados antes da paginação, com total coerente e desempate estável.
+* [x] Exclusão de Test Cases para administradores, com confirmação, bloqueio de duplicidade e feedback.
+* [x] Histórico de Reports com envelope paginado aninhado; estatísticas globais e por suíte, seletores completos, geração e exportação integral preservados.
+* [x] Homologação manual no navegador aprovada pelo usuário para as funcionalidades desta entrega.
+* [ ] Paginação do resultado gerado em Reports e de POST /relatorios/generate: fora do escopo desta entrega.
+
+A conclusão deste item abrange as sete listagens acima, incluindo somente o histórico de Reports. Não representa conclusão dos demais itens da Fase 4 nem das fases de testes. Este registro atualiza o diagnóstico estático anterior sobre paginação.
 
 ### Motivo
 
@@ -253,6 +269,14 @@ Separar regras de negócio do acesso ao banco.
 * Testes de segurança ✅
 
 ---
+
+### Validação relacionada à entrega de paginação
+
+* [x] Execução anterior informada: 35 testes unitários e 81 testes de integração aprovados nas suítes selecionadas, usando clone PostgreSQL descartável para integração.
+* [x] Validação local isolada desta entrega: 53 testes aprovados em cinco suítes, sem banco real; cobre paginação, filtros/ordenação, contratos legados, permissões de exclusão, CRUD de Projects e contratos da API frontend.
+* [ ] Executar o novo cenário de desempate e preservação dos agregados em backend/tests/relatorios-stats.test.js, somente após autorização e confirmação de banco isolado. A aprovação anterior de integração não inclui esse cenário posterior.
+
+Os testes isolados do módulo de API frontend usam Node com --experimental-vm-modules. Estes resultados não comprovam cobertura global nem concluem os itens 17 e 18. Carga/performance permanece adiada.
 
 ## 17. Testes Frontend
 

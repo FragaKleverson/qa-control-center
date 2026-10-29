@@ -3,6 +3,11 @@
  */
 
 const { z } = require("zod");
+const { paginationQuerySchema } = require("./common");
+
+const listQuerySchema = paginationQuerySchema.extend({
+  projeto_id: z.coerce.number().int().positive().max(2147483647).optional(),
+});
 
 // Status válidos para execuções e resultados
 const STATUS_EXECUCAO = [
@@ -45,4 +50,4 @@ const updateResultSchema = z.object({
   comentario: z.string().max(2000).nullable().optional(),
 });
 
-module.exports = { createSchema, updateSchema, updateResultSchema };
+module.exports = { createSchema, updateSchema, updateResultSchema, listQuerySchema };

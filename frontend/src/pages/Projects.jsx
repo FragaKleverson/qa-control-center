@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
 import { projectsAPI } from "../services/api";
 import "./Pages.css";
 
 export default function Projects() {
-  const [projects, setProjects] = useState([]);
+  const {
+    data: projects, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadProjects, mounted,
+  } = usePaginatedList(projectsAPI.list);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -20,12 +25,11 @@ export default function Projects() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -33,17 +37,6 @@ export default function Projects() {
     toastTimerRef.current = setTimeout(() => {
       setToast({ message: "", type: "" });
     }, 3000);
-  }
-
-  // Busca todos os projetos da API
-  async function loadProjects() {
-    try {
-      const data = await projectsAPI.list();
-      setProjects(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar projetos", "error");
-    }
   }
 
   // Cria um novo projeto via API; valida campos obrigatórios
@@ -62,6 +55,7 @@ export default function Projects() {
         ...formData,
         cenarios: []
       });
+      if (!mounted.current) return;
 
       if (!res.id) {
         showToast(res.error || "Erro ao criar projeto", "error");
@@ -77,7 +71,7 @@ export default function Projects() {
       console.error(err);
       showToast("Erro ao criar projeto", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -94,6 +88,7 @@ export default function Projects() {
     setLoading(true);
     try {
       await projectsAPI.update(editingProject.id, editData);
+      if (!mounted.current) return;
       showToast("Projeto atualizado!", "success");
       setIsEditOpen(false);
       setEditingProject(null);
@@ -102,7 +97,7 @@ export default function Projects() {
       console.error(err);
       showToast("Erro ao atualizar projeto", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -116,6 +111,7 @@ export default function Projects() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await projectsAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Projeto deletado", "success");
           loadProjects();
         } catch (err) {
@@ -143,8 +139,12 @@ export default function Projects() {
         </div>
 
         <div className="card">
-          <h2>Your Projects ({projects.length})</h2>
-          {projects.length === 0 ? (
+          <h2>Your Projects ({isLoading ? "…" : total})</h2>
+          {isLoading ? <p role="status">Carregando projetos...</p> : listError ? (
+            <div role="alert">{listError}<button onClick={loadProjects}>Tentar novamente</button></div>
+          ) : projects.length === 0 && total > 0 ? (
+            <p>Esta página está temporariamente sem registros.</p>
+          ) : projects.length === 0 ? (
             <p>No projects created yet. Create one to get started!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
@@ -187,6 +187,9 @@ export default function Projects() {
               ))}
             </div>
           )}
+          <Pagination loading={isLoading} error={Boolean(listError)} empty={projects.length === 0}
+            page={page} pageSize={pageSize} total={total}
+            onPageChange={setPage} onPageSizeChange={setPageSize} />
         </div>
       </div>
 

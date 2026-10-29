@@ -68,6 +68,36 @@ describe("Relatórios e Stats - Suite completa", () => {
     // =====================================================
     describe("GET /relatorios?page=&limit=", () => {
 
+        it("desempata datas iguais por ID sem paginar os agregados", async () => {
+            const suite = await createSuite();
+            const projeto = await createProjeto();
+            const ids = [];
+            for (let i = 0; i < 3; i++) {
+                const result = await pool.query(
+                    "INSERT INTO execucoes (suite_id, ambiente, status, created_at) VALUES ($1, 'staging', 'passed', '2026-01-01T00:00:00Z') RETURNING id",
+                    [suite.id]
+                );
+                ids.push(result.rows[0].id);
+                await pool.query(
+                    "INSERT INTO execution_results (execucao_id, projeto_id, status) VALUES ($1, $2, 'passed')",
+                    [result.rows[0].id, projeto.id]
+                );
+            }
+            const legacy = await request(app).get("/relatorios");
+            const first = await request(app).get("/relatorios?page=1&limit=2");
+            const second = await request(app).get("/relatorios?page=2&limit=2");
+            expect([legacy.statusCode, first.statusCode, second.statusCode]).toEqual([200, 200, 200]);
+            const expected = [...ids].sort((a, b) => b - a);
+            expect(legacy.body.executions.map(e => e.id)).toEqual(expected);
+            expect([...first.body.executions.data, ...second.body.executions.data].map(e => e.id)).toEqual(expected);
+            expect(second.body.executions).toMatchObject({ total: 3, page: 2, limit: 2 });
+            for (const res of [first, second]) {
+                expect(res.body.stats).toEqual(legacy.body.stats);
+                expect(res.body.suiteStats).toEqual(legacy.body.suiteStats);
+                expect(Number(res.body.suiteStats[0].total)).toBe(3);
+            }
+        });
+
         it("sem page/limit, executions continua sendo array simples (compatibilidade)", async () => {
             const suite = await createSuite();
             await pool.query(

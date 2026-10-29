@@ -3,6 +3,52 @@
 // Nunca hardcode a URL aqui — use a variável de ambiente para suportar múltiplos ambientes.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
+// Monta querystring de paginação, filtro e ordenação — omite chaves ausentes.
+// Usado pelas listagens paginadas (Fase 4, item 12 / UI).
+function buildPaginationQuery({ page, limit, projeto_id, sort_by, sort_dir } = {}) {
+  const params = new URLSearchParams();
+  if (page !== undefined) params.set("page", page);
+  if (limit !== undefined) params.set("limit", limit);
+  if (projeto_id !== undefined) params.set("projeto_id", projeto_id);
+  if (sort_by !== undefined) params.set("sort_by", sort_by);
+  if (sort_dir !== undefined) params.set("sort_dir", sort_dir);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+// Mantém o Response de sucesso intacto, inclusive para downloads.
+async function checkHttpResponse(res) {
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message = typeof body?.error === "string" && body.error.trim()
+      ? body.error
+      : `Erro HTTP ${res.status}`;
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
+  return res;
+}
+
+// Valida antes de atualizar o estado, preservando a lista anterior em caso de erro.
+export function parsePaginationResponse(response) {
+  const legacy = Array.isArray(response);
+  const data = legacy ? response : response?.data;
+  const total = legacy ? response.length : response?.total;
+  if (
+    !Array.isArray(data) ||
+    data.some((item) => !item || typeof item !== "object" || Array.isArray(item)) ||
+    !Number.isSafeInteger(total) || total < 0 || total < data.length ||
+    (!legacy && (
+      !Number.isSafeInteger(response.page) || response.page < 1 ||
+      !Number.isSafeInteger(response.limit) || response.limit < 1 || response.limit > 100
+    ))
+  ) {
+    throw new Error("Resposta de listagem inválida");
+  }
+  return { data, total };
+}
+
 // Wrapper que injeta o Bearer token e redireciona para /login em 401
 function apiFetch(url, options = {}) {
   const token = localStorage.getItem("qa_token");
@@ -17,7 +63,7 @@ function apiFetch(url, options = {}) {
       window.location.href = "/login";
       throw new Error("Sessão expirada. Faça login novamente.");
     }
-    return res;
+    return checkHttpResponse(res);
   });
 }
 
@@ -28,12 +74,13 @@ export const authAPI = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    }).then(r => r.json()),
+    }).then(checkHttpResponse).then(r => r.json()),
 };
 
 // ==================== PROJETOS ====================
 export const projectsAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/projetos`).then(r => r.json()),
+  // Sem params: array simples (compat). Com { page, limit }: { data, total, page, limit }.
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/projetos${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/projetos`, {
       method: "POST",
@@ -54,7 +101,7 @@ export const projectsAPI = {
 
 // ==================== TEST SUITES ====================
 export const testSuitesAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/test-suites`).then(r => r.json()),
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/test-suites${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/test-suites`, {
       method: "POST",
@@ -81,7 +128,7 @@ export const testSuitesAPI = {
 
 // ==================== REQUIREMENTS ====================
 export const requirementsAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/requirements`).then(r => r.json()),
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/requirements${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/requirements`, {
       method: "POST",
@@ -96,7 +143,7 @@ export const requirementsAPI = {
 
 // ==================== TEST PLANS ====================
 export const testPlansAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/test-plans`).then(r => r.json()),
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/test-plans${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/test-plans`, {
       method: "POST",
@@ -135,7 +182,7 @@ export const testPlansAPI = {
 
 // ==================== EXECUÇÕES ====================
 export const executionsAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/execucoes`).then(r => r.json()),
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/execucoes${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/execucoes`, {
       method: "POST",
@@ -146,8 +193,8 @@ export const executionsAPI = {
     apiFetch(`${API_BASE_URL}/execucoes/${id}`, { method: "DELETE" }).then(r =>
       r.json()
     ),
-  getStats: () =>
-    apiFetch(`${API_BASE_URL}/execucoes/stats/summary`).then(r => r.json()),
+  getStats: (options) =>
+    apiFetch(`${API_BASE_URL}/execucoes/stats/summary`, options).then(r => r.json()),
   getResults: (execucaoId) =>
     apiFetch(`${API_BASE_URL}/execucoes/${execucaoId}/results`).then(r => r.json()),
   updateResult: (execucaoId, projetoId, data) =>
@@ -164,7 +211,7 @@ export const executionsAPI = {
 
 // ==================== RELATÓRIOS ====================
 export const reportsAPI = {
-  list: () => apiFetch(`${API_BASE_URL}/relatorios`).then(r => r.json()),
+  list: (pagination, options) => apiFetch(`${API_BASE_URL}/relatorios${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   generate: (filters) =>
     apiFetch(`${API_BASE_URL}/relatorios/generate`, {
       method: "POST",

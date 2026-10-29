@@ -3,6 +3,12 @@
  */
 
 const { z } = require("zod");
+const { paginationQuerySchema } = require("./common");
+
+const listQuerySchema = paginationQuerySchema.extend({
+  sort_by: z.enum(["id", "created_at"]).optional(),
+  sort_dir: z.enum(["asc", "desc"]).optional(),
+});
 
 // Criação: titulo, descricao e feature são obrigatórios (regra do service)
 const createSchema = z.object({
@@ -21,4 +27,4 @@ const updateSchema = z.object({
   cenarios: z.any().optional(),
 });
 
-module.exports = { createSchema, updateSchema };
+module.exports = { createSchema, updateSchema, listQuerySchema };

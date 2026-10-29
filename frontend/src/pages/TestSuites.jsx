@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { testSuitesAPI, projectsAPI } from "../services/api";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
+import { testSuitesAPI, projectsAPI, parsePaginationResponse } from "../services/api";
 import "./Pages.css";
 
 export default function TestSuites() {
-  const [suites, setSuites] = useState([]);
+  const {
+    data: suites, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadSuites, mounted,
+  } = usePaginatedList(testSuitesAPI.list);
   const [allProjects, setAllProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCasesModalOpen, setIsCasesModalOpen] = useState(false);
@@ -17,37 +22,27 @@ export default function TestSuites() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
   useEffect(() => {
-    loadSuites();
-    loadProjects();
+    const controller = new AbortController();
+    projectsAPI.list(undefined, { signal: controller.signal })
+      .then(parsePaginationResponse)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setAllProjects(data);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error(err);
+      });
+    return () => controller.abort();
   }, []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  // Busca todas as test suites da API
-  async function loadSuites() {
-    try {
-      const data = await testSuitesAPI.list();
-      setSuites(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar test suites", "error");
-    }
-  }
-
-  // Busca todos os test cases (projetos) para exibir no modal de vínculo
-  async function loadProjects() {
-    try {
-      const data = await projectsAPI.list();
-      setAllProjects(data);
-    } catch (err) {
-      console.error(err);
-    }
   }
 
   // Abre o modal de gestão de test cases de uma suite e carrega os vinculados
@@ -56,8 +51,10 @@ export default function TestSuites() {
     setIsCasesModalOpen(true);
     try {
       const cases = await testSuitesAPI.getCases(suite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao carregar test cases", "error");
     }
@@ -67,10 +64,13 @@ export default function TestSuites() {
   async function handleAddCase(projetoId) {
     try {
       await testSuitesAPI.addCase(selectedSuite.id, projetoId);
+      if (!mounted.current) return;
       const cases = await testSuitesAPI.getCases(selectedSuite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
       showToast("Test case adicionado à suite!", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao adicionar test case", "error");
     }
@@ -80,10 +80,13 @@ export default function TestSuites() {
   async function handleRemoveCase(projetoId) {
     try {
       await testSuitesAPI.removeCase(selectedSuite.id, projetoId);
+      if (!mounted.current) return;
       const cases = await testSuitesAPI.getCases(selectedSuite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
       showToast("Test case removido da suite", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao remover test case", "error");
     }
@@ -100,16 +103,18 @@ export default function TestSuites() {
     }
     try {
       const res = await testSuitesAPI.create(formData);
+      if (!mounted.current) return;
       if (!res.id) { showToast("Erro ao criar suite", "error"); setLoading(false); return; }
       showToast("Test Suite criada com sucesso!", "success");
       setFormData({ nome: "", descricao: "" });
       setIsModalOpen(false);
       loadSuites();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao criar test suite", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
@@ -123,9 +128,11 @@ export default function TestSuites() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await testSuitesAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Test Suite deletada", "success");
           loadSuites();
         } catch (err) {
+          if (!mounted.current) return;
           console.error(err);
           showToast("Erro ao deletar test suite", "error");
         }
@@ -153,8 +160,17 @@ export default function TestSuites() {
         </div>
 
         <div className="card">
-          <h2>Your Test Suites ({suites.length})</h2>
-          {suites.length === 0 ? (
+          <h2>Your Test Suites ({isLoading || listError ? "..." : total})</h2>
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadSuites}>Tentar novamente</button>
+            </div>
+          ) : suites.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : suites.length === 0 ? (
             <p>No test suites created yet. Create one to get started!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
@@ -184,6 +200,17 @@ export default function TestSuites() {
               ))}
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={suites.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 
