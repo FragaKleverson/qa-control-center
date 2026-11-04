@@ -1,3 +1,4 @@
+import ActionButton from "./ActionButton";
 // Diálogo de confirmação reutilizável com animação fade+pop
 // danger=true: botão confirmar vermelho | danger=false: botão verde
 export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel, danger = true }) {
@@ -46,16 +47,9 @@ export default function ConfirmDialog({ isOpen, message, onConfirm, onCancel, da
           >
             Cancelar
           </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              background: danger ? "#ef4444" : "#10b981",
-              padding: "9px 20px",
-              fontSize: "14px",
-            }}
-          >
-            Confirmar
-          </button>
+          <ActionButton action={danger ? "delete" : "view"} onClick={onConfirm}>
+            {danger ? "Excluir" : "Confirmar"}
+          </ActionButton>
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import ActionButton from "../components/ActionButton";
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -5,6 +6,8 @@ import { useAuth } from "../contexts/AuthContext";
 import Pagination from "../components/Pagination";
 import usePaginatedList from "../hooks/usePaginatedList";
 import { projectsAPI } from "../services/api";
+import useProjectLink from "../hooks/useProjectLink";
+import TestCaseProjectField, { TestCaseProjectValue } from "../components/TestCaseProject";
 import "./Pages.css";
 
 const CATEGORIAS = [
@@ -25,14 +28,7 @@ function formatTCId(id) {
 }
 
 // Ícone SVG para o botão de edição na tabela
-function PencilIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
-}
+
 
 const thStyle = {
   padding: "10px 14px",
@@ -52,6 +48,7 @@ const tdStyle = {
 
 export default function TestCases() {
   const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
   const canDelete = user?.role === "admin";
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -63,8 +60,11 @@ export default function TestCases() {
   } = usePaginatedList(projectsAPI.list, { sort_by: "id", sort_dir: "desc" });
   const sortAsc = query.sort_dir === "asc";
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const projectLink = useProjectLink(isModalOpen);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const formSession = useRef(null);
+  const [cenariosChanged, setCenariosChanged] = useState(false);
   const [doc, setDoc] = useState(EMPTY_DOC);
   const [viewingTC, setViewingTC] = useState(null);
   const toastTimerRef = useRef(null);
@@ -85,8 +85,21 @@ export default function TestCases() {
     setViewingTC(tc);
   }
 
+  function beginForm() {
+    formSession.current = { pending: false };
+    setLoading(false); setCenariosChanged(false);
+    clearTimeout(toastTimerRef.current); setToast({ message: "", type: "" });
+  }
+  function closeForm() {
+    formSession.current = null;
+    setIsModalOpen(false); setLoading(false);
+  }
+
   // Abre o modal para criação de novo test case com campos zerados
   function openAddModal() {
+    if (!canWrite) return;
+    beginForm();
+    projectLink.reset();
     setEditingId(null);
     setDoc({ ...EMPTY_DOC, cenarios: [{ nome: "", tipo: "Happy Path", passos: "" }] });
     setIsModalOpen(true);
@@ -94,6 +107,9 @@ export default function TestCases() {
 
   // Abre o modal de edição preenchido com os dados do test case selecionado
   function openEditModal(tc) {
+    if (!canWrite) return;
+    beginForm();
+    projectLink.reset(tc);
     setEditingId(tc.id);
     setDoc({
       titulo: tc.titulo || "",
@@ -101,7 +117,10 @@ export default function TestCases() {
       feature: tc.feature || "",
       cenarios:
         Array.isArray(tc.cenarios) && tc.cenarios.length > 0
-          ? tc.cenarios.map((c) => ({ nome: c.nome || "", tipo: c.tipo || "Happy Path", passos: c.passos || "" }))
+          ? tc.cenarios.map((c, index) => index > 0 ? c : ({
+              ...(c && typeof c === "object" && !Array.isArray(c) ? c : {}),
+              nome: c?.nome || "", tipo: c?.tipo || "Happy Path", passos: c?.passos || "",
+            }))
           : [{ nome: "", tipo: "Happy Path", passos: "" }],
     });
     setIsModalOpen(true);
@@ -114,36 +133,44 @@ export default function TestCases() {
 
   // Atualiza um campo do único cenário (sempre índice 0)
   function updateCenario(field, value) {
-    setDoc((prev) => ({ ...prev, cenarios: [{ ...prev.cenarios[0], [field]: value }] }));
+    setCenariosChanged(true);
+    setDoc((prev) => ({ ...prev, cenarios: [{ ...prev.cenarios[0], [field]: value }, ...prev.cenarios.slice(1)] }));
   }
 
   // Valida e persiste o test case (cria ou atualiza conforme editingId)
   async function saveTestCase() {
+    const session = formSession.current;
+    if (!canWrite || !session || session.pending) return;
+    const isCurrent = () => mounted.current && formSession.current === session;
+    const sendScenarios = !editingId || cenariosChanged;
+    session.pending = true;
     setLoading(true);
-    const hasEmpty = doc.cenarios.some((c) => !c.nome.trim() || !c.tipo.trim() || !c.passos.trim());
+    const hasEmpty = sendScenarios && doc.cenarios.slice(0, 1).some((c) => [c.nome, c.tipo, c.passos].some(value => typeof value !== "string" || !value.trim()));
     if (!doc.titulo.trim() || !doc.descricao.trim() || !doc.feature.trim() || hasEmpty) {
       showToast("Preenche tudo direito aí", "warning");
-      setLoading(false);
+      session.pending = false; setLoading(false);
       return;
     }
     try {
+      const { cenarios, ...fields } = doc;
+      const payload = { ...fields, ...(sendScenarios ? { cenarios } : {}), ...projectLink.payload() };
       if (editingId) {
-        await projectsAPI.update(editingId, doc);
-        if (!mounted.current) return;
+        await projectsAPI.update(editingId, payload);
+        if (!isCurrent()) return;
         showToast("Atualizado com sucesso", "success");
       } else {
-        await projectsAPI.create(doc);
-        if (!mounted.current) return;
+        await projectsAPI.create(payload);
+        if (!isCurrent()) return;
         showToast("Salvo com sucesso", "success");
       }
-      setIsModalOpen(false);
+      closeForm();
       loadTestCases();
     } catch (err) {
-      if (!mounted.current) return;
+      if (!isCurrent()) return;
       console.error(err);
-      showToast("Erro na API", "error");
+      showToast(err.message || "Erro na API", "error");
     } finally {
-      if (mounted.current) setLoading(false);
+      if (isCurrent()) { session.pending = false; setLoading(false); }
     }
   }
 
@@ -171,7 +198,7 @@ export default function TestCases() {
     <div className="page">
       <ConfirmDialog
         isOpen={Boolean(deleteTarget)}
-        message={`Excluir ${formatTCId(deleteTarget?.id)}? Este registro também deixará de aparecer em Projects.`}
+        message={`Excluir ${formatTCId(deleteTarget?.id)}? O catálogo independente de Projects será preservado.`}
         onConfirm={deleteTestCase}
         onCancel={() => setDeleteTarget(null)}
       />
@@ -182,7 +209,7 @@ export default function TestCases() {
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <h2 style={{ margin: 0 }}>All Test Cases ({isLoading || listError ? "..." : total})</h2>
-            <button onClick={openAddModal}>+ New Test Case</button>
+            {canWrite && <button onClick={openAddModal}>+ New Test Case</button>}
           </div>
 
           {isLoading ? (
@@ -240,12 +267,9 @@ export default function TestCases() {
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                     >
                       <td style={{ ...tdStyle, fontFamily: "monospace", fontWeight: "700", whiteSpace: "nowrap" }}>
-                        <button
-                          onClick={() => openViewModal(tc)}
-                          style={{ background: "none", color: "#6366f1", padding: "2px 4px", fontFamily: "monospace", fontWeight: "700", fontSize: "14px", boxShadow: "none", transform: "none", textDecoration: "underline", cursor: "pointer" }}
-                        >
+                        <ActionButton action="view" aria-label={`Visualizar ${formatTCId(tc.id)}`} onClick={() => openViewModal(tc)}>
                           {formatTCId(tc.id)}
-                        </button>
+                        </ActionButton>
                       </td>
                       <td style={{ ...tdStyle, maxWidth: "340px" }}>
                         <span
@@ -266,23 +290,11 @@ export default function TestCases() {
                       <td style={{ ...tdStyle, color: "#9ca3af", whiteSpace: "nowrap", fontSize: "12px" }}>
                         {tc.created_at ? new Date(tc.created_at).toLocaleDateString("pt-BR") : "-"}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: "center" }}>
-                        <button
-                          onClick={() => openEditModal(tc)}
-                          title="Editar"
-                          style={{ background: "#e0e7ff", color: "#4338ca", padding: "6px 10px", fontSize: "12px", boxShadow: "none", transform: "none" }}
-                        >
-                          <PencilIcon />
-                        </button>
+                      <td style={{ ...tdStyle, textAlign: "center" }}><div className="action-buttons">
+                        {canWrite && <ActionButton action="edit" onClick={() => openEditModal(tc)} title="Editar">Editar</ActionButton>}
                         {canDelete && (
-                          <button
-                            onClick={() => setDeleteTarget(tc)}
-                            disabled={deletingId !== null}
-                            aria-label={`Excluir ${formatTCId(tc.id)}`}
-                            style={{ background: "#ef4444", marginLeft: "8px", padding: "6px 10px" }}
-                          >Excluir</button>
-                        )}
-                      </td>
+                          <ActionButton action="delete" onClick={() => setDeleteTarget(tc)} disabled={deletingId !== null} aria-label={`Excluir ${formatTCId(tc.id)}`}>Excluir</ActionButton>
+                        )}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -306,7 +318,8 @@ export default function TestCases() {
       <Modal
         isOpen={isModalOpen}
         title={editingId ? `Editar ${formatTCId(editingId)}` : "New Test Case"}
-        onClose={() => setIsModalOpen(false)}
+        onClose={closeForm}
+        dialogLabel="Formulario de Test Case"
       >
         <div style={{ maxHeight: "68vh", overflowY: "auto", paddingRight: "4px" }}>
           <input
@@ -324,6 +337,8 @@ export default function TestCases() {
             value={doc.feature}
             onChange={(e) => updateField("feature", e.target.value)}
           />
+
+          <TestCaseProjectField link={projectLink} disabled={loading || !canWrite} />
 
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
             <input
@@ -351,7 +366,7 @@ export default function TestCases() {
             <button onClick={saveTestCase} disabled={loading}>
               {loading ? "Salvando..." : editingId ? "Atualizar" : "Salvar"}
             </button>
-            <button onClick={() => setIsModalOpen(false)} style={{ background: "#6b7280" }}>Cancelar</button>
+            <button onClick={closeForm} style={{ background: "#6b7280" }}>Cancelar</button>
           </div>
         </div>
       </Modal>
@@ -381,9 +396,11 @@ export default function TestCases() {
               </code>
             </div>
 
+            <TestCaseProjectValue record={viewingTC} />
+
             {Array.isArray(viewingTC.cenarios) && viewingTC.cenarios.length > 0 && (
               <div>
-                {viewingTC.cenarios.map((c, i) => (
+                {viewingTC.cenarios.map((c, i) => c && typeof c === "object" && !Array.isArray(c) && [c.nome, c.tipo, c.passos].every(value => value == null || typeof value === "string") ? (
                   <div key={i} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "16px", marginBottom: "12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                       <span style={{ fontWeight: "700", fontSize: "14px", color: "#111827" }}>{c.nome}</span>
@@ -393,8 +410,11 @@ export default function TestCases() {
                       {c.passos}
                     </pre>
                   </div>
-                ))}
+                ) : <pre key={i} style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(c, null, 2)}</pre>)}
               </div>
+            )}
+            {viewingTC.cenarios != null && !Array.isArray(viewingTC.cenarios) && (
+              <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(viewingTC.cenarios, null, 2)}</pre>
             )}
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "16px", borderTop: "1px solid #e5e7eb", marginTop: "4px" }}>
@@ -402,12 +422,7 @@ export default function TestCases() {
                 {viewingTC.created_at ? new Date(viewingTC.created_at).toLocaleDateString("pt-BR") : ""}
               </span>
               <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={() => { setViewingTC(null); openEditModal(viewingTC); }}
-                  style={{ background: "#e0e7ff", color: "#4338ca", padding: "8px 18px", fontSize: "13px", boxShadow: "none", transform: "none" }}
-                >
-                  Editar
-                </button>
+                {canWrite && <ActionButton action="edit" onClick={() => { setViewingTC(null); openEditModal(viewingTC); }}>Editar</ActionButton>}
                 <button onClick={() => setViewingTC(null)} style={{ background: "#6b7280" }}>Fechar</button>
               </div>
             </div>

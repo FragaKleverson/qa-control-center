@@ -12,13 +12,19 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const app = require("../src/app");
 const authMiddleware = require("../src/middleware/auth");
-const { clearTables, closePool, createProjeto } = require("./helpers/db");
+const { clearTables, clearUsers, closePool, createProjeto } = require("./helpers/db");
 const { createTestUser, TEST_USER } = require("./helpers/auth");
 
 const securedApp = express();
 securedApp.use(express.json());
 securedApp.use(authMiddleware);
 securedApp.get("/secured", (req, res) => res.json({ user: req.user }));
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
     // Nota: não chama clearUsers() aqui — o bypass de auth em NODE_ENV=test

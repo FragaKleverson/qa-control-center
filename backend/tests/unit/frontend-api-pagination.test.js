@@ -65,3 +65,31 @@ it("geração e exportação não recebem paginação do histórico", async () =
     expect(JSON.parse(options.body)).toEqual(filters);
   }
 });
+
+it("executa plano sem enviar ambiente escolhido pelo cliente", async () => {
+  respond({ id: 8, plan_id: 3, ambiente: "production" });
+  await api.testPlansAPI.execute(3, "qa");
+  const [url, options] = fetchMock.mock.calls[0];
+  expect(url).toBe("http://localhost:3001/test-plans/3/execute");
+  expect(JSON.parse(options.body)).toEqual({});
+});
+it.each([409, 422, 503])("preserva status HTTP %i para tratamento da interface", async (status) => {
+  fetchMock.mockResolvedValueOnce({ ok: false, status, json: async () => ({ error: "Mensagem do servidor" }) });
+  await expect(api.testPlansAPI.execute(3)).rejects.toMatchObject({ status, message: "Mensagem do servidor" });
+});
+it("consulta plano e execucao pelos endpoints existentes", async () => {
+  respond({ id: 3, executed_at: "2026-10-30", execution_id: 8 });
+  await api.testPlansAPI.getById(3);
+  respond({ id: 8, plan_id: 3 }); await api.executionsAPI.getById(8);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+    "http://localhost:3001/test-plans/3", "http://localhost:3001/execucoes/8",
+  ]);
+});
+
+it("frontend and backend expose exactly the same four canonical environments", async () => {
+  const module = new vm.SourceTextModule(fs.readFileSync(
+    path.join(__dirname, "../../../frontend/src/domain/environments.js"), "utf8"));
+  await module.link(() => { throw new Error("Unexpected import"); }); await module.evaluate();
+  expect(Array.from(module.namespace.ENVIRONMENTS)).toEqual(require("../../src/domain/environments").ENVIRONMENTS);
+  expect(module.namespace.ENVIRONMENTS).toHaveLength(4);
+});

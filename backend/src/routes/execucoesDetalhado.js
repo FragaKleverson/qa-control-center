@@ -63,7 +63,7 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 });
 
 // DELETE - Deletar execução
-router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const deleted = await executionsService.delete(req.params.id);
     await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });

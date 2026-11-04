@@ -3,14 +3,15 @@
  */
 
 const { z } = require("zod");
+const { environmentSchema } = require("../domain/environments");
 
-// Criação: titulo obrigatório; demais campos opcionais com default vazio
+// Criacao: titulo e ambiente obrigatorios; demais campos opcionais.
 const createSchema = z.object({
   titulo: z.string().trim().min(1, "Título é obrigatório"),
   descricao: z.string().optional().default(""),
   escopo: z.string().optional().default(""),
   objetivo: z.string().optional().default(""),
-  ambiente: z.string().optional().default(""),
+  ambiente: environmentSchema,
 });
 
 // Atualização: todos opcionais
@@ -19,7 +20,7 @@ const updateSchema = z.object({
   descricao: z.string().optional(),
   escopo: z.string().optional(),
   objetivo: z.string().optional(),
-  ambiente: z.string().optional(),
+  ambiente: environmentSchema.optional(),
 });
 
 // Vincular suite ao plan: suite_id obrigatório
@@ -30,9 +31,7 @@ const addSuiteSchema = z.object({
     .positive("suite_id deve ser um inteiro positivo"),
 });
 
-// Executar plan: ambiente opcional com default "staging"
-const executeSchema = z.object({
-  ambiente: z.string().max(255).optional().default("staging"),
-});
+// Ambiente enviado por clientes antigos e descartado; a origem e o plano.
+const executeSchema = z.object({});
 
 module.exports = { createSchema, updateSchema, addSuiteSchema, executeSchema };

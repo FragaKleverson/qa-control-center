@@ -1,4 +1,7 @@
+import ActionButton from "../components/ActionButton";
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect, useRef } from "react";
+import { ENVIRONMENTS } from "../domain/environments";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import GherkinDisplay from "../components/GherkinDisplay";
@@ -22,6 +25,9 @@ function getStatusInfo(status) {
 }
 
 export default function Executions() {
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
+  const canDelete = user?.role === "admin";
   const {
     data: executions, page, pageSize, total, setPage, setPageSize,
     isLoading, error: listError, reload: loadExecutions, mounted,
@@ -109,6 +115,7 @@ export default function Executions() {
 
   // Salva a observação de um test case
   async function handleUpdateResultComentario(execucaoId, projetoId, comentario, currentStatus) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: currentStatus, comentario });
       if (!mounted.current) return;
@@ -128,6 +135,7 @@ export default function Executions() {
 
   // Atualiza o status de um test case dentro de uma execução
   async function handleUpdateResultStatus(execucaoId, projetoId, newStatus) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: newStatus });
       if (!mounted.current) return;
@@ -148,6 +156,7 @@ export default function Executions() {
 
   // Finaliza a execução: calcula status final e bloqueia edição
   async function handleFinalizeExecution(id) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.finalize(id);
       if (!mounted.current) return;
@@ -165,6 +174,7 @@ export default function Executions() {
   // Cria uma nova execução manual a partir do formulário
   async function handleRunExecution(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setLoading(true);
     if (!formData.suite_id) {
       showToast("Selecione uma test suite", "warning");
@@ -190,6 +200,7 @@ export default function Executions() {
 
   // Abre dialog de confirmação antes de deletar uma execução
   function handleDeleteExecution(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar esta execução?",
@@ -230,7 +241,7 @@ export default function Executions() {
               <h2>Start New Execution</h2>
               <p>Run a test suite to verify your application</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>Run Suite</button>
+            {canWrite && (<button onClick={() => setIsModalOpen(true)}>Run Suite</button>)}
           </div>
         </div>
 
@@ -330,13 +341,10 @@ export default function Executions() {
                       </div>
 
                       <div style={{ display: "flex", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                        <button
-                          onClick={() => toggleExpand(execution.id)}
-                          style={{ background: "#6366f1", padding: "8px 14px", fontSize: "12px" }}
-                        >
-                          {isExpanded ? "Fechar" : "Ver Cases"}
-                        </button>
-                        {!execution.finalized && (
+                        <ActionButton action="view" onClick={() => toggleExpand(execution.id)}>
+                          {isExpanded ? "Fechar" : "Visualizar casos"}
+                        </ActionButton>
+                        {canWrite && !execution.finalized && (
                           <button
                             onClick={() => handleFinalizeExecution(execution.id)}
                             style={{ background: "#10b981", padding: "8px 14px", fontSize: "12px", fontWeight: "700" }}
@@ -344,12 +352,7 @@ export default function Executions() {
                             ✔ Finalizar
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDeleteExecution(execution.id)}
-                          style={{ background: "#ef4444", padding: "8px 14px", fontSize: "12px" }}
-                        >
-                          Delete
-                        </button>
+                        {canDelete && (<ActionButton action="delete" onClick={() => handleDeleteExecution(execution.id)}>Excluir</ActionButton>)}
                       </div>
                     </div>
 
@@ -382,7 +385,7 @@ export default function Executions() {
                                         {result.titulo}
                                       </span>
                                     </div>
-                                    {execution.finalized ? (
+                                    {!canWrite || execution.finalized ? (
                                       <p style={{ margin: "4px 0 0 0", color: "#6b7280", fontSize: "12px", fontStyle: "italic" }}>
                                         {result.comentario || <span style={{ opacity: 0.5 }}>Sem observação</span>}
                                       </p>
@@ -398,13 +401,8 @@ export default function Executions() {
                                     )}
                                   </div>
                                   <div style={{ display: "flex", gap: "6px", flexShrink: 0, marginLeft: "12px" }}>
-                                    <button
-                                      onClick={() => openResultDetail(result)}
-                                      style={{ background: "#e5e7eb", color: "#374151", padding: "4px 10px", fontSize: "11px" }}
-                                    >
-                                      Ver
-                                    </button>
-                                    {execution.finalized ? (
+                                    <ActionButton action="view" onClick={() => openResultDetail(result)}>Visualizar</ActionButton>
+                                    {!canWrite || execution.finalized ? (
                                       <span style={{ background: rs.bg, color: rs.color, padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", border: "1px solid #e5e7eb" }}>
                                         {rs.label}
                                       </span>
@@ -447,7 +445,7 @@ export default function Executions() {
       </div>
 
       {/* Modal: Criar execução manual */}
-      <Modal isOpen={isModalOpen} title="Run Test Suite" onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isModalOpen && canWrite} title="Run Test Suite" onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleRunExecution}>
           <label style={{ display: "block", marginBottom: "16px" }}>
             <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>Test Suite</span>
@@ -470,10 +468,7 @@ export default function Executions() {
               onChange={(e) => setFormData({ ...formData, ambiente: e.target.value })}
               style={{ width: "100%", padding: "12px", marginTop: "8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px" }}
             >
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-              <option value="dev">Dev</option>
-              <option value="qa">QA</option>
+              {ENVIRONMENTS.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
           <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>

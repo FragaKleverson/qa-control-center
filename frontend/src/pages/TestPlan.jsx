@@ -1,12 +1,30 @@
+import ActionButton from "../components/ActionButton";
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { planExecutionView, executionLookupMessage } from "../domain/planExecution";
+import { ENVIRONMENTS } from "../domain/environments";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Pagination from "../components/Pagination";
 import usePaginatedList from "../hooks/usePaginatedList";
-import { testPlansAPI, testSuitesAPI, parsePaginationResponse } from "../services/api";
+import { testPlansAPI, testSuitesAPI, executionsAPI, parsePaginationResponse } from "../services/api";
 import "./Pages.css";
 
 export default function TestPlan() {
+  const { user } = useAuth();
+  const canDelete = user?.role === "admin";
+  const canManage = ["admin", "qa"].includes(user?.role);
+  const canChange = (plan) => canManage && !plan.executed_at && plan.legacy_classification === "eligible";
+  const executionLock = useRef(false);
+  const suitesRequest = useRef(0);
+  const suitesMutation = useRef(null);
+  const executionRequest = useRef(0);
+  const formSession = useRef(null);
+  const [suitesError, setSuitesError] = useState("");
+  const [suitesLoading, setSuitesLoading] = useState(false);
+  const [executionDetail, setExecutionDetail] = useState(null);
+  const [executionError, setExecutionError] = useState("");
+  const [executionOpen, setExecutionOpen] = useState(false);
   const {
     data: plans, page, pageSize, total, setPage, setPageSize,
     isLoading, error: listError, reload: loadPlans, mounted,
@@ -18,13 +36,37 @@ export default function TestPlan() {
   const [planSuites, setPlanSuites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [execModal, setExecModal] = useState({ isOpen: false, plan: null, ambiente: "staging" });
+  const [execModal, setExecModal] = useState({ isOpen: false, plan: null });
   const [formData, setFormData] = useState({
     titulo: "", descricao: "", escopo: "", objetivo: "", ambiente: ""
   });
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
+
+  async function viewExecution(id) {
+    const request = ++executionRequest.current;
+    setExecutionOpen(true); setExecutionDetail(null); setExecutionError("");
+    try {
+      const [execution, results] = await Promise.all([executionsAPI.getById(id), executionsAPI.getResults(id)]);
+      if (mounted.current && request === executionRequest.current) setExecutionDetail({ execution, results: parsePaginationResponse(results).data });
+    } catch (err) { if (mounted.current && request === executionRequest.current) { setExecutionError(executionLookupMessage(err)); if (err.status === 404) loadPlans(); } }
+  }
+  function openCreateForm() {
+    formSession.current = { pending: false };
+    setLoading(false); setIsModalOpen(true);
+  }
+  function closeCreateForm() {
+    formSession.current = null;
+    setLoading(false); setIsModalOpen(false);
+  }
+  function mutationError(err) {
+    if (err.status === 409) {
+      loadPlans(); setExecModal((v) => ({ ...v, isOpen: false }));
+      setIsSuitesModalOpen(false);
+    }
+    showToast(err.message || "Falha na operação", "error");
+  }
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
@@ -51,102 +93,130 @@ export default function TestPlan() {
 
   // Abre o modal de gestão de suites de um plan e carrega as vinculadas
   async function openSuitesModal(plan) {
-    setSelectedPlan(plan);
-    setIsSuitesModalOpen(true);
+    const request = ++suitesRequest.current;
+    setSelectedPlan(plan); setPlanSuites([]); setSuitesError("");
+    setSuitesLoading(true); setIsSuitesModalOpen(true);
     try {
       const suites = await testPlansAPI.getSuites(plan.id);
-      if (!mounted.current) return;
-      setPlanSuites(parsePaginationResponse(suites).data);
+      if (mounted.current && request === suitesRequest.current) setPlanSuites(parsePaginationResponse(suites).data);
     } catch (err) {
-      if (!mounted.current) return;
-      console.error(err);
-      showToast("Erro ao carregar suites do plan", "error");
+      if (mounted.current && request === suitesRequest.current) setSuitesError(err.message);
+    } finally {
+      if (mounted.current && request === suitesRequest.current) setSuitesLoading(false);
     }
   }
 
   // Vincula uma suite ao plan selecionado
   async function handleAddSuite(suiteId) {
+    if (!selectedPlan || !canChange(selectedPlan) || suitesLoading || suitesError || suitesMutation.current === suitesRequest.current) return;
+    const request = ++suitesRequest.current;
+    suitesMutation.current = request;
+    setSuitesLoading(true);
     try {
       await testPlansAPI.addSuite(selectedPlan.id, suiteId);
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       const suites = await testPlansAPI.getSuites(selectedPlan.id);
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       setPlanSuites(parsePaginationResponse(suites).data);
       showToast("Suite adicionada ao plan!", "success");
     } catch (err) {
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       console.error(err);
-      showToast("Erro ao adicionar suite", "error");
+      setSuitesError(err.message || "Falha ao atualizar suites.");
+      mutationError(err);
+    } finally {
+      if (suitesMutation.current === request) suitesMutation.current = null;
+      if (mounted.current && request === suitesRequest.current) setSuitesLoading(false);
     }
   }
 
   // Remove o vínculo de uma suite do plan selecionado
   async function handleRemoveSuite(suiteId) {
+    if (!canDelete) return;
+    if (!selectedPlan || !canChange(selectedPlan) || suitesLoading || suitesError || suitesMutation.current === suitesRequest.current) return;
+    const request = ++suitesRequest.current;
+    suitesMutation.current = request;
+    setSuitesLoading(true);
     try {
       await testPlansAPI.removeSuite(selectedPlan.id, suiteId);
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       const suites = await testPlansAPI.getSuites(selectedPlan.id);
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       setPlanSuites(parsePaginationResponse(suites).data);
       showToast("Suite removida do plan", "success");
     } catch (err) {
-      if (!mounted.current) return;
+      if (!mounted.current || request !== suitesRequest.current) return;
       console.error(err);
-      showToast("Erro ao remover suite", "error");
+      setSuitesError(err.message || "Falha ao atualizar suites.");
+      mutationError(err);
+    } finally {
+      if (suitesMutation.current === request) suitesMutation.current = null;
+      if (mounted.current && request === suitesRequest.current) setSuitesLoading(false);
     }
   }
 
-  // Abre modal de escolha de ambiente para executar o plan
-  function handleExecutePlan(plan) {
-    setExecModal({ isOpen: true, plan, ambiente: plan.ambiente || "staging" });
+  // Valida o estado atual antes de confirmar o ambiente herdado do plano
+  async function handleExecutePlan(plan) {
+    if (executionLock.current || !canChange(plan)) return;
+    executionLock.current = true; setExecuting(true);
+    try {
+      const fresh = await testPlansAPI.getById(plan.id);
+      const suites = parsePaginationResponse(await testPlansAPI.getSuites(plan.id)).data;
+      if (!canChange(fresh)) throw Object.assign(new Error("Estado do plano alterado. Atualize a consulta."), { status: 409 });
+      if (!ENVIRONMENTS.includes(fresh.ambiente)) throw new Error("Regularize o ambiente do plano antes de executar.");
+      if (!suites.some((suite) => !suite.deleted_at && Number(suite.total_cases) > 0)) {
+        throw new Error("Vincule uma suite ativa com pelo menos um caso ativo.");
+      }
+      if (mounted.current) setExecModal({ isOpen: true, plan: fresh });
+    } catch (err) { if (mounted.current) mutationError(err); }
+    finally { executionLock.current = false; if (mounted.current) setExecuting(false); }
   }
 
   async function confirmExecutePlan() {
-    const { plan, ambiente } = execModal;
-    setExecModal((s) => ({ ...s, isOpen: false }));
-    setExecuting(true);
+    if (executionLock.current) return;
+    executionLock.current = true; setExecuting(true);
     try {
-      const exec = await testPlansAPI.execute(plan.id, ambiente);
+      const exec = await testPlansAPI.execute(execModal.plan.id);
       if (!mounted.current) return;
-      if (exec.error) throw new Error(exec.error);
-      showToast(`Execução #${exec.id} criada! Vá para Executions para acompanhar.`, "success");
-    } catch (err) {
-      if (!mounted.current) return;
-      console.error(err);
-      showToast("Erro ao executar plan: " + err.message, "error");
-    } finally {
-      if (mounted.current) setExecuting(false);
-    }
+      setExecModal((v) => ({ ...v, isOpen: false })); loadPlans();
+      showToast(`Execução #${exec.id} criada!`, "success");
+    } catch (err) { if (mounted.current) mutationError(err); }
+    finally { executionLock.current = false; if (mounted.current) setExecuting(false); }
   }
 
   // Cria um novo test plan via API; valida campo título
   async function handleCreatePlan(e) {
     e.preventDefault();
+    const session = formSession.current;
+    if (!canManage || !session || session.pending) return;
+    const isCurrent = () => mounted.current && formSession.current === session;
     setLoading(true);
-    if (!formData.titulo.trim()) {
-      showToast("Preencha o título", "warning");
+    if (!formData.titulo.trim() || !ENVIRONMENTS.includes(formData.ambiente)) {
+      showToast("Preencha o título e selecione um ambiente oficial", "warning");
       setLoading(false);
       return;
     }
+    session.pending = true;
     try {
       const res = await testPlansAPI.create(formData);
-      if (!mounted.current) return;
+      if (!isCurrent()) return;
       if (!res.id) { showToast("Erro ao criar plan", "error"); setLoading(false); return; }
       showToast("Test Plan criado com sucesso!", "success");
       setFormData({ titulo: "", descricao: "", escopo: "", objetivo: "", ambiente: "" });
-      setIsModalOpen(false);
+      closeCreateForm();
       loadPlans();
     } catch (err) {
-      if (!mounted.current) return;
+      if (!isCurrent()) return;
       console.error(err);
-      showToast("Erro ao criar test plan", "error");
+      mutationError(err);
     } finally {
-      if (mounted.current) setLoading(false);
+      if (isCurrent()) { session.pending = false; setLoading(false); }
     }
   }
 
   // Abre dialog de confirmação antes de deletar um test plan
   function handleDeletePlan(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar este test plan?",
@@ -161,7 +231,7 @@ export default function TestPlan() {
         } catch (err) {
           if (!mounted.current) return;
           console.error(err);
-          showToast("Erro ao deletar test plan", "error");
+          mutationError(err);
         }
       },
     });
@@ -182,7 +252,7 @@ export default function TestPlan() {
               <h2>Create New Test Plan</h2>
               <p>Define a comprehensive test plan for your project</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>+ New Plan</button>
+            {canManage && <button onClick={openCreateForm}>+ New Plan</button>}
           </div>
         </div>
 
@@ -203,34 +273,29 @@ export default function TestPlan() {
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
               {plans.map((plan) => (
                 <div key={plan.id} style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: "12px" }}>
                     <div style={{ flex: 1 }}>
                       <h3 style={{ margin: "0 0 8px 0", color: "#111827" }}>{plan.titulo}</h3>
+                      <p>{plan.executed_at || plan.legacy_classification === "executed" ? "Executado" : plan.legacy_classification !== "eligible" ? "Legado: revisão necessária" : "Não executado"}</p>
+                      {plan.executed_at && <p>{new Date(plan.executed_at).toLocaleString()}</p>}
+                      {canChange(plan) && !ENVIRONMENTS.includes(plan.ambiente) && <p role="alert">Ambiente não canônico: regularização autorizada necessária antes de executar.</p>}
+                      {planExecutionView(plan).available && <ActionButton action="view" onClick={() => viewExecution(plan.execution_id)}>Visualizar execução #{plan.execution_id}</ActionButton>}
+                      {planExecutionView(plan).message && <p role="status">{planExecutionView(plan).message}</p>}
                       <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>{plan.descricao}</p>
                       {plan.escopo && <p style={{ margin: "0 0 4px 0", color: "#9ca3af", fontSize: "12px" }}><strong>Escopo:</strong> {plan.escopo}</p>}
                       {plan.objetivo && <p style={{ margin: "0 0 4px 0", color: "#9ca3af", fontSize: "12px" }}><strong>Objetivo:</strong> {plan.objetivo}</p>}
                       {plan.ambiente && <p style={{ margin: "0", color: "#9ca3af", fontSize: "12px" }}><strong>Ambiente:</strong> {plan.ambiente}</p>}
                     </div>
-                    <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                      <button
-                        onClick={() => openSuitesModal(plan)}
-                        style={{ background: "#6366f1", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Manage Suites
-                      </button>
+                    <div className="action-buttons">
+                      <ActionButton action="view" onClick={() => openSuitesModal(plan)}>{canChange(plan) ? "Gerenciar suítes" : "Visualizar detalhes e suítes"}</ActionButton>
                       <button
                         onClick={() => handleExecutePlan(plan)}
-                        disabled={executing}
+                        disabled={executing || !canChange(plan) || !ENVIRONMENTS.includes(plan.ambiente)}
                         style={{ background: "#10b981", padding: "8px 16px", fontSize: "12px" }}
                       >
                         Execute
                       </button>
-                      <button
-                        onClick={() => handleDeletePlan(plan.id)}
-                        style={{ background: "#ef4444", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Delete
-                      </button>
+                      {user?.role === "admin" && <ActionButton action="delete" onClick={() => handleDeletePlan(plan.id)}>Excluir</ActionButton>}
                     </div>
                   </div>
                 </div>
@@ -252,7 +317,7 @@ export default function TestPlan() {
       </div>
 
       {/* Modal: Criar plan */}
-      <Modal isOpen={isModalOpen} title="Create New Test Plan" onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isModalOpen} title="Create New Test Plan" onClose={closeCreateForm} dialogLabel="Formulario de Test Plan">
         <form onSubmit={handleCreatePlan}>
           <input
             type="text"
@@ -264,15 +329,15 @@ export default function TestPlan() {
           <textarea placeholder="Description" value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} style={{ minHeight: "80px", marginBottom: "16px" }} />
           <textarea placeholder="Scope (Escopo)" value={formData.escopo} onChange={(e) => setFormData({ ...formData, escopo: e.target.value })} style={{ minHeight: "60px", marginBottom: "16px" }} />
           <textarea placeholder="Objective (Objetivo)" value={formData.objetivo} onChange={(e) => setFormData({ ...formData, objetivo: e.target.value })} style={{ minHeight: "60px", marginBottom: "16px" }} />
-          <input
-            type="text"
-            placeholder="Environment (Ambiente)"
-            value={formData.ambiente}
-            onChange={(e) => setFormData({ ...formData, ambiente: e.target.value })}
-          />
+          <label>Environment
+            <select required value={formData.ambiente} onChange={(e) => setFormData({ ...formData, ambiente: e.target.value })}>
+              <option value="">Selecione um ambiente</option>
+              {ENVIRONMENTS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
           <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
             <button type="submit" disabled={loading}>{loading ? "Creating..." : "Create Plan"}</button>
-            <button type="button" onClick={() => setIsModalOpen(false)} style={{ background: "#6b7280" }}>Cancel</button>
+            <button type="button" onClick={closeCreateForm} style={{ background: "#6b7280" }}>Cancel</button>
           </div>
         </form>
       </Modal>
@@ -281,9 +346,12 @@ export default function TestPlan() {
       <Modal
         isOpen={isSuitesModalOpen}
         title={`Suites - ${selectedPlan?.titulo || ""}`}
-        onClose={() => { setIsSuitesModalOpen(false); setSelectedPlan(null); setPlanSuites([]); }}
+        onClose={() => { suitesRequest.current++; setIsSuitesModalOpen(false); setSelectedPlan(null); setPlanSuites([]); }}
       >
         <div>
+          <p>{selectedPlan?.descricao}</p><p>{selectedPlan?.escopo}</p><p>{selectedPlan?.objetivo}</p>
+          {suitesLoading && <p role="status">Carregando suites...</p>}
+          {suitesError && <p role="alert">{suitesError}</p>}
           <div style={{ marginBottom: "24px" }}>
             <h3 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: "700", color: "#374151", textTransform: "uppercase" }}>
               Vinculadas ({planSuites.length})
@@ -295,12 +363,12 @@ export default function TestPlan() {
                 {planSuites.map((suite) => (
                   <div key={suite.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#ecfdf5", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
                     <div>
-                      <span style={{ fontWeight: "600", color: "#065f46", fontSize: "14px" }}>{suite.nome}</span>
+                      <span style={{ fontWeight: "600", color: "#065f46", fontSize: "14px" }}>{suite.nome}{suite.deleted_at ? " (excluída)" : ""}</span>
                       <span style={{ marginLeft: "10px", color: "#6b7280", fontSize: "12px" }}>
                         {suite.total_cases || 0} test case{suite.total_cases !== "1" ? "s" : ""}
                       </span>
                     </div>
-                    <button onClick={() => handleRemoveSuite(suite.id)} style={{ background: "#ef4444", padding: "4px 12px", fontSize: "12px" }}>Remover</button>
+                    {selectedPlan && canDelete && canChange(selectedPlan) && !suitesLoading && !suitesError && <ActionButton action="delete" onClick={() => handleRemoveSuite(suite.id)}>Excluir vínculo</ActionButton>}
                   </div>
                 ))}
               </div>
@@ -317,8 +385,8 @@ export default function TestPlan() {
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {availableToLink.map((suite) => (
                   <div key={suite.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f9fafb", borderRadius: "6px", border: "1px solid #e5e7eb" }}>
-                    <span style={{ fontWeight: "600", color: "#374151", fontSize: "14px" }}>{suite.nome}</span>
-                    <button onClick={() => handleAddSuite(suite.id)} style={{ background: "#6366f1", padding: "4px 12px", fontSize: "12px" }}>+ Adicionar</button>
+                    <span style={{ fontWeight: "600", color: "#374151", fontSize: "14px" }}>{suite.nome}{suite.deleted_at ? " (excluída)" : ""}</span>
+                    {selectedPlan && canChange(selectedPlan) && !suitesLoading && !suitesError && <button onClick={() => handleAddSuite(suite.id)} style={{ background: "#6366f1", padding: "4px 12px", fontSize: "12px" }}>+ Adicionar</button>}
                   </div>
                 ))}
               </div>
@@ -335,21 +403,11 @@ export default function TestPlan() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <p style={{ margin: 0, color: "#374151", fontSize: "14px" }}>
-            Escolha o ambiente onde este plan será executado:
+            O ambiente será herdado do plano. Esta ação bloqueia novas execuções e alterações.
           </p>
           <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", fontWeight: "600", color: "#374151" }}>
             Ambiente
-            <select
-              value={execModal.ambiente}
-              onChange={(e) => setExecModal((s) => ({ ...s, ambiente: e.target.value }))}
-              style={{ padding: "9px 12px", border: "1.5px solid #d1d5db", borderRadius: "7px", fontSize: "14px", background: "#fff" }}
-            >
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-              <option value="development">Development</option>
-              <option value="homologation">Homologação</option>
-              <option value="qa">QA</option>
-            </select>
+            <span>{execModal.plan?.ambiente}</span>
           </label>
           <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
             <button
@@ -371,6 +429,12 @@ export default function TestPlan() {
         </div>
       </Modal>
 
+      <Modal isOpen={executionOpen} title="Execução do plano" onClose={() => { executionRequest.current++; setExecutionOpen(false); }}>
+        {executionError ? <p role="alert">{executionError}</p> : !executionDetail ? <p role="status">Carregando...</p> : <div>
+          <p>#{executionDetail.execution.id} - {executionDetail.execution.status} - {executionDetail.execution.ambiente}</p>
+          {executionDetail.results.map((result) => <p key={result.id}>{result.titulo}: {result.status}</p>)}
+        </div>}
+      </Modal>
       <ConfirmDialog
         isOpen={confirmState.isOpen}
         message={confirmState.message}

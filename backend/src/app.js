@@ -9,6 +9,7 @@ const swaggerSpec = require("./swagger");
 const config = require("./config/env");
 const { globalLimiter, perUserLimiter } = require("./middleware/rateLimiters");
 const projetosRoutes = require("./routes/projetos");
+const projectsRoutes = require("./routes/projects");
 const testSuitesRoutes = require("./routes/testSuites");
 const requirementsRoutes = require("./routes/requirements");
 const testPlansRoutes = require("./routes/testPlans");
@@ -177,6 +178,7 @@ if (process.env.NODE_ENV !== "test") {
    ROTAS PROTEGIDAS
 ========================= */
 app.use("/projetos", projetosRoutes);
+app.use("/projects", projectsRoutes);
 app.use("/test-suites", testSuitesRoutes);
 app.use("/requirements", requirementsRoutes);
 app.use("/test-plans", testPlansRoutes);

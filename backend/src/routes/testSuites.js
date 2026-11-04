@@ -62,7 +62,7 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 });
 
 // DELETE - Deletar test suite
-router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const deleted = await testSuitesService.delete(req.params.id);
     await logAudit({ userId: req.user?.id, entityType: "test_suite", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
@@ -83,7 +83,7 @@ router.post("/:id/cases", authorize("admin", "qa"), validate(idParamSchema, "par
 });
 
 // DELETE - Desvincular test case de uma suite
-router.delete("/:id/cases/:projetoId", authorize("admin", "qa"), validate(idAndProjetoIdSchema, "params"), async (req, res, next) => {
+router.delete("/:id/cases/:projetoId", authorize("admin"), validate(idAndProjetoIdSchema, "params"), async (req, res, next) => {
   try {
     await testSuitesService.removeCase(req.params.id, req.params.projetoId);
     res.json({ message: "Test case removido da suite" });

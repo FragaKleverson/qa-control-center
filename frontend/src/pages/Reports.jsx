@@ -1,3 +1,4 @@
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { executionsAPI, reportsAPI, testSuitesAPI, parsePaginationResponse } from "../services/api";
 import Pagination from "../components/Pagination";
@@ -23,6 +24,8 @@ function StatusBadge({ status }) {
 }
 
 export default function Reports() {
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
   // Dados gerais
   const [stats, setStats] = useState({ total: 0, passed: 0, failed: 0, pending: 0 });
   const [suiteStats, setSuiteStats] = useState([]);
@@ -35,7 +38,7 @@ export default function Reports() {
   }, []);
   const {
     data: recentExecutions, page, pageSize, total, setPage, setPageSize,
-    isLoading: historyLoading, error: historyError, reload: reloadHistory, mounted,
+    isLoading: historyLoading, error: historyError, reload: reloadHistory,
   } = usePaginatedList(listHistory);
   const [suites, setSuites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +52,18 @@ export default function Reports() {
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
 
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
   const showToast = useCallback((message, type = "info") => {
     if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }, [mounted]);
+  }, []);
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
@@ -84,6 +93,7 @@ export default function Reports() {
 
   async function handleGenerate(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setGenerating(true);
     setGenerated(null);
     try {
@@ -104,6 +114,7 @@ export default function Reports() {
   // Baixa o relatório atual como arquivo .docx
   async function handleExportDocx(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setDownloading(true);
     try {
       const payload = {};
@@ -281,13 +292,13 @@ export default function Reports() {
                   {suites.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                 </select>
               </label>
-              <button type="submit" disabled={generating} style={{ padding: "10px 20px", whiteSpace: "nowrap" }}>
+              <button type="submit" disabled={generating || !canWrite} style={{ padding: "10px 20px", whiteSpace: "nowrap" }}>
                 {generating ? "Gerando…" : "Gerar"}
               </button>
               <button
                 type="button"
                 onClick={handleExportDocx}
-                disabled={downloading}
+                disabled={downloading || !canWrite}
                 style={{ padding: "10px 20px", whiteSpace: "nowrap", background: "#10b981" }}
               >
                 {downloading ? "Exportando…" : "⬇ .docx"}

@@ -1,3 +1,5 @@
+import ActionButton from "../components/ActionButton";
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -7,6 +9,9 @@ import { testSuitesAPI, projectsAPI, parsePaginationResponse } from "../services
 import "./Pages.css";
 
 export default function TestSuites() {
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
+  const canDelete = user?.role === "admin";
   const {
     data: suites, page, pageSize, total, setPage, setPageSize,
     isLoading, error: listError, reload: loadSuites, mounted,
@@ -62,6 +67,7 @@ export default function TestSuites() {
 
   // Vincula um test case à suite selecionada
   async function handleAddCase(projetoId) {
+    if (!canWrite) return;
     try {
       await testSuitesAPI.addCase(selectedSuite.id, projetoId);
       if (!mounted.current) return;
@@ -78,6 +84,7 @@ export default function TestSuites() {
 
   // Remove o vínculo de um test case da suite selecionada
   async function handleRemoveCase(projetoId) {
+    if (!canDelete) return;
     try {
       await testSuitesAPI.removeCase(selectedSuite.id, projetoId);
       if (!mounted.current) return;
@@ -95,6 +102,7 @@ export default function TestSuites() {
   // Cria uma nova test suite via API; valida campo nome
   async function handleCreateSuite(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setLoading(true);
     if (!formData.nome.trim()) {
       showToast("Preencha o nome", "warning");
@@ -120,6 +128,7 @@ export default function TestSuites() {
 
   // Abre dialog de confirmação antes de deletar uma suite
   function handleDeleteSuite(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar esta test suite?",
@@ -155,7 +164,7 @@ export default function TestSuites() {
               <h2>Create New Test Suite</h2>
               <p>Create a new suite to group related test cases</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>+ New Suite</button>
+            {canWrite && (<button onClick={() => setIsModalOpen(true)}>+ New Suite</button>)}
           </div>
         </div>
 
@@ -176,24 +185,14 @@ export default function TestSuites() {
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
               {suites.map((suite) => (
                 <div key={suite.id} style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: "12px" }}>
                     <div style={{ flex: 1 }}>
                       <h3 style={{ margin: "0 0 4px 0", color: "#111827" }}>{suite.nome}</h3>
                       <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>{suite.descricao}</p>
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        onClick={() => openCasesModal(suite)}
-                        style={{ background: "#6366f1", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Manage Cases
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSuite(suite.id)}
-                        style={{ background: "#ef4444", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Delete
-                      </button>
+                    <div className="action-buttons">
+                      <ActionButton action="view" onClick={() => openCasesModal(suite)}>Visualizar casos</ActionButton>
+                      {canDelete && (<ActionButton action="delete" onClick={() => handleDeleteSuite(suite.id)}>Excluir</ActionButton>)}
                     </div>
                   </div>
                 </div>
@@ -215,7 +214,7 @@ export default function TestSuites() {
       </div>
 
       {/* Modal: Criar suite */}
-      <Modal isOpen={isModalOpen} title="Create New Test Suite" onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isModalOpen && canWrite} title="Create New Test Suite" onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleCreateSuite}>
           <input
             type="text"
@@ -261,12 +260,7 @@ export default function TestSuites() {
                         {tc.cenarios && Array.isArray(tc.cenarios) ? `${tc.cenarios.length} cenários` : ""}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handleRemoveCase(tc.id)}
-                      style={{ background: "#ef4444", padding: "4px 12px", fontSize: "12px" }}
-                    >
-                      Remover
-                    </button>
+                    {canDelete && (<ActionButton action="delete" onClick={() => handleRemoveCase(tc.id)}>Excluir vínculo</ActionButton>)}
                   </div>
                 ))}
               </div>
@@ -290,12 +284,12 @@ export default function TestSuites() {
                         {tc.cenarios && Array.isArray(tc.cenarios) ? `${tc.cenarios.length} cenários` : ""}
                       </span>
                     </div>
-                    <button
+                    {canWrite && (<button
                       onClick={() => handleAddCase(tc.id)}
                       style={{ background: "#6366f1", padding: "4px 12px", fontSize: "12px" }}
                     >
                       + Adicionar
-                    </button>
+                    </button>)}
                   </div>
                 ))}
               </div>

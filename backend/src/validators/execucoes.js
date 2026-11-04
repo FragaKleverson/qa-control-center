@@ -3,6 +3,7 @@
  */
 
 const { z } = require("zod");
+const { environmentSchema } = require("../domain/environments");
 const { paginationQuerySchema } = require("./common");
 
 const listQuerySchema = paginationQuerySchema.extend({
@@ -27,7 +28,7 @@ const createSchema = z.object({
     .number()
     .int()
     .positive("suite_id deve ser um inteiro positivo"),
-  ambiente: z.string().max(255).optional().default("staging"),
+  ambiente: environmentSchema.optional().default("staging"),
   status: z.enum(STATUS_EXECUCAO, {
     errorMap: () => ({ message: `Status deve ser: ${STATUS_EXECUCAO.join(", ")}` }),
   }).optional().default("pending"),

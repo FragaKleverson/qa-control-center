@@ -1,4 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import ActionButton from "../components/ActionButton";
+import { useAuth } from "../contexts/AuthContext";
+import { useState, useEffect, useRef, useCallback } from "react";
+import RecordDetailsModal, { ViewRecordButton } from "../components/RecordDetails";
+import useRecordDetails from "../hooks/useRecordDetails";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Pagination from "../components/Pagination";
@@ -7,6 +11,10 @@ import { requirementsAPI } from "../services/api";
 import "./Pages.css";
 
 export default function Requirements() {
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
+  const canDelete = user?.role === "admin";
+  const details = useRecordDetails(requirementsAPI.getById);
   const {
     data: requirements, page, pageSize, total, setPage, setPageSize,
     isLoading, error: listError, reload: loadRequirements, mounted,
@@ -22,6 +30,9 @@ export default function Requirements() {
   const toastTimerRef = useRef(null);
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
+
+  // Stable callbacks keep closed sibling modals from resetting the scroll lock.
+  const closeCreate = useCallback(() => setIsModalOpen(false), []);
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
@@ -40,6 +51,7 @@ export default function Requirements() {
   // Cria um novo requirement via API; valida campo título
   async function handleCreateRequirement(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setLoading(true);
 
     if (!formData.titulo.trim()) {
@@ -74,6 +86,7 @@ export default function Requirements() {
 
   // Abre dialog de confirmação antes de deletar um requirement
   function handleDeleteRequirement(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar este requirement?",
@@ -120,7 +133,7 @@ export default function Requirements() {
               <h2>Create New Requirement</h2>
               <p>Define requirements for your test cases</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>+ New Requirement</button>
+            {canWrite && (<button onClick={() => setIsModalOpen(true)}>+ New Requirement</button>)}
           </div>
         </div>
 
@@ -149,8 +162,8 @@ export default function Requirements() {
                     border: "1px solid #e5e7eb"
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                    <div style={{ flex: 1 }}>
+                  <div className="record-list-row">
+                    <div className="record-list-info">
                       <h3 style={{ margin: "0 0 8px 0", color: "#111827" }}>{req.titulo}</h3>
                       <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>
                         {req.descricao}
@@ -164,16 +177,10 @@ export default function Requirements() {
                         </span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteRequirement(req.id)}
-                      style={{
-                        background: "#ef4444",
-                        padding: "8px 16px",
-                        fontSize: "12px"
-                      }}
-                    >
-                      Delete
-                    </button>
+                    <div className="record-list-actions">
+                      <ViewRecordButton record={req} onView={details.open} />
+                      {canDelete && (<ActionButton action="delete" onClick={() => handleDeleteRequirement(req.id)}>Excluir</ActionButton>)}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -194,9 +201,9 @@ export default function Requirements() {
       </div>
 
       <Modal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen && canWrite}
         title="Create New Requirement"
-        onClose={() => setIsModalOpen(false)}
+        onClose={closeCreate}
       >
         <form onSubmit={handleCreateRequirement}>
           <input
@@ -249,6 +256,7 @@ export default function Requirements() {
         </form>
       </Modal>
 
+      <RecordDetailsModal viewer={details} kind="requirement" />
       <ConfirmDialog
         isOpen={confirmState.isOpen}
         message={confirmState.message}

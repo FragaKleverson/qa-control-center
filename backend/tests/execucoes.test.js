@@ -6,8 +6,15 @@
 
 const request = require("supertest");
 const app = require("../src/app");
-const { clearTables, closePool, createSuite, createProjeto } = require("./helpers/db");
+const { createTestUser } = require("./helpers/auth");
+const { clearTables, clearUsers, closePool, createSuite, createProjeto } = require("./helpers/db");
 const pool = require("../src/db");
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
   await clearTables();
@@ -134,11 +141,11 @@ describe("Execuções API - Suite completa", () => {
             const suite = await createSuite();
             const res = await request(app)
                 .post("/execucoes")
-                .send({ suite_id: suite.id, ambiente: "qa", status: "pending" });
+                .send({ suite_id: suite.id, ambiente: "development", status: "pending" });
 
             expect(res.statusCode).toBe(201);
             expect(res.body).toHaveProperty("id");
-            expect(res.body.ambiente).toBe("qa");
+            expect(res.body.ambiente).toBe("development");
         });
 
         it("deve usar valores padrão de ambiente e status", async () => {

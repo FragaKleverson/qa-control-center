@@ -79,6 +79,7 @@ export const authAPI = {
 
 // ==================== PROJETOS ====================
 export const projectsAPI = {
+  getById: (id, options) => apiFetch(`${API_BASE_URL}/projetos/${id}`, options).then(r => r.json()),
   // Sem params: array simples (compat). Com { page, limit }: { data, total, page, limit }.
   list: (pagination, options) => apiFetch(`${API_BASE_URL}/projetos${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
@@ -97,6 +98,19 @@ export const projectsAPI = {
     apiFetch(`${API_BASE_URL}/projetos/${id}`, { method: "DELETE" }).then(r =>
       r.json()
     ),
+};
+
+// Independent catalog: keep projectsAPI pointing to legacy Test Cases.
+export const projectCatalogAPI = {
+  list: ({ page, limit } = {}, options) => apiFetch(`${API_BASE_URL}/projects${buildPaginationQuery({ page, limit })}`, options).then(r => r.json()),
+  getById: (id, options) => apiFetch(`${API_BASE_URL}/projects/${id}`, options).then(r => r.json()),
+  create: (data) => apiFetch(`${API_BASE_URL}/projects`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+  }).then(r => r.json()),
+  update: (id, data) => apiFetch(`${API_BASE_URL}/projects/${id}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+  }).then(r => r.json()),
+  delete: (id) => apiFetch(`${API_BASE_URL}/projects/${id}`, { method: "DELETE" }).then(r => r.json()),
 };
 
 // ==================== TEST SUITES ====================
@@ -128,6 +142,7 @@ export const testSuitesAPI = {
 
 // ==================== REQUIREMENTS ====================
 export const requirementsAPI = {
+  getById: (id, options) => apiFetch(`${API_BASE_URL}/requirements/${id}`, options).then(r => r.json()),
   list: (pagination, options) => apiFetch(`${API_BASE_URL}/requirements${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/requirements`, {
@@ -143,6 +158,7 @@ export const requirementsAPI = {
 
 // ==================== TEST PLANS ====================
 export const testPlansAPI = {
+  getById: (id) => apiFetch(`${API_BASE_URL}/test-plans/${id}`).then(r => r.json()),
   list: (pagination, options) => apiFetch(`${API_BASE_URL}/test-plans${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/test-plans`, {
@@ -172,16 +188,17 @@ export const testPlansAPI = {
     apiFetch(`${API_BASE_URL}/test-plans/${planId}/suites/${suiteId}`, {
       method: "DELETE",
     }).then(r => r.json()),
-  execute: (planId, ambiente = "staging") =>
+  execute: (planId) =>
     apiFetch(`${API_BASE_URL}/test-plans/${planId}/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ambiente }),
+      body: JSON.stringify({}),
     }).then(r => r.json()),
 };
 
 // ==================== EXECUÇÕES ====================
 export const executionsAPI = {
+  getById: (id) => apiFetch(`${API_BASE_URL}/execucoes/${id}`).then(r => r.json()),
   list: (pagination, options) => apiFetch(`${API_BASE_URL}/execucoes${buildPaginationQuery(pagination)}`, options).then(r => r.json()),
   create: (data) =>
     apiFetch(`${API_BASE_URL}/execucoes`, {

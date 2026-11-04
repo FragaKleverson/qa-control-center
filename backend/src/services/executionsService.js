@@ -3,6 +3,7 @@
  */
 
 const pool = require("../db");
+const { environmentSchema } = require("../domain/environments");
 const AppError = require("../middleware/AppError");
 const { paginate, isPaginationRequested } = require("./pagination");
 
@@ -48,6 +49,7 @@ const executionsService = {
 
   create: async (data, userId = null) => {
     const { suite_id, ambiente = "staging", status = "pending", resultado = null } = data;
+    if (!environmentSchema.safeParse(ambiente).success) throw new AppError("Ambiente invalido", 422);
     if (!suite_id) throw new Error("suite_id é obrigatório");
     const result = await query(
       "INSERT INTO execucoes (suite_id, ambiente, status, resultado, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",

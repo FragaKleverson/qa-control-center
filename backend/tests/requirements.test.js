@@ -5,7 +5,8 @@
 
 const request = require("supertest");
 const app = require("../src/app");
-const { clearTables, closePool, createRequirement } = require("./helpers/db");
+const { createTestUser } = require("./helpers/auth");
+const { clearTables, clearUsers, closePool, createRequirement } = require("./helpers/db");
 
 const PAYLOAD_VALIDO = {
   titulo: "REQ-001: Usuário deve fazer login",
@@ -13,6 +14,12 @@ const PAYLOAD_VALIDO = {
   status: "Open",
   prioridade: "High",
 };
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
   await clearTables();
