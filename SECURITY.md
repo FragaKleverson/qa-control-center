@@ -1,5 +1,19 @@
 # 🔒 Políticas de Segurança
 
+## Proteção de ambientes e resultados atuais
+
+Não executar migrations, resets ou limpeza em qadb:5433, qa_control_test:5434 ou
+qa_control_integration:5435. O Último contém homologação manual que deve ser
+preservada. O ensaio independente em 5436 permanece preservado com evidências.
+Homologação RBAC manual 6/6 e visual aprovadas pelo usuário; isso não resolve as
+limitações globais de sessão/JWT nem autoriza novas operações de escrita.
+
+[Política operacional e resultados](backend/FEATURE-VALIDATION-STATUS.md).
+Arquivos .env locais, credenciais, descritores, snapshots, logs e builds não devem
+ser versionados; o ignore não protege arquivos que já estejam rastreados. Exemplos
+de configuração devem conter somente placeholders ou valores sintéticos identificados.
+
+
 ## Environment Variables
 
 ### ⚠️ Regras Críticas
@@ -80,3 +94,13 @@
 - [OWASP - Secrets Management](https://owasp.org/www-community/Secrets_Management)
 - [Node.js Security Best Practices](https://nodejs.org/en/docs/guides/security/)
 - [JWT.io](https://jwt.io/)
+
+## RBAC - regra definitiva (04/11/2026)
+
+- Admin: consultar, criar, editar, excluir e restaurar, respeitando o estado do registro.
+- QA: consultar, criar e editar; nunca excluir ou restaurar.
+- Reader: somente consultar; nunca criar, editar, excluir ou restaurar.
+- Todas as rotas DELETE e POST de restauracao exigem Admin, inclusive desvinculacoes.
+- Regras adicionais permanecem: planos executados sao imutaveis para todos os perfis.
+- Ocultacao de botoes nao substitui autenticacao JWT e autorizacao no backend.
+- Inventario, excecoes de autenticacao e evidencias: [RBAC-PERMISSIONS.md](backend/RBAC-PERMISSIONS.md).

@@ -1,5 +1,27 @@
 # QA Control Center
 
+## Estado da feature — 04/11/2026
+
+Projects possui catálogo independente em /projects; Test Cases mantém /projetos
+com Project opcional. Test Plans têm execução única e imutabilidade após execução.
+Admin exclui/restaura; QA cria/edita/consulta; Reader consulta.
+
+Validações confirmadas: **651 isolados/27 suítes**, **339 integrados anteriores**,
+ensaio histórico sintético aprovado (**10 migrations, 60 registros preservados**),
+fluxo manual **9/9**, RBAC manual **6/6** e visual homologado pelo usuário. Prisma
+validate, build Vite e ESLint aprovados anteriormente. Não equivalem a deploy em
+banco original nem a testes de grande volume. Este resumo não reexecutou validações.
+
+Usar **Node 22.13+ na linha 22**; homologado com **22.17.1**. Os Dockerfiles usam
+node:22-alpine. Os manifests aceitam outras linhas, que não foram homologadas aqui.
+[Resultados, ambientes protegidos, contratos e limitações](backend/FEATURE-VALIDATION-STATUS.md).
+
+As instruções genéricas de instalação abaixo destinam-se somente a uma instalação
+nova autorizada. Neste workspace não iniciar/recriar serviços existentes nem usar
+5433/5434/5435 para migrations ou limpeza. Banco descartável com evidências também
+deve ser preservado. Nenhum arquivo de ambiente, senha ou snapshot deve ser commitado.
+
+
 Plataforma completa de gerenciamento e execução de testes para times de QA.
 
 Inspirada em ferramentas como TestRail, Xray e QMetry — mas sem a burocracia e sem o preço.
@@ -68,7 +90,7 @@ Inspirada em ferramentas como TestRail, Xray e QMetry — mas sem a burocracia e
 | Autenticação | JWT (`jsonwebtoken`) + bcrypt |
 | Segurança | Helmet · CORS configurável · Rate Limiting · HPP |
 | Infra | Docker + Docker Compose |
-| Testes | Jest + Supertest (banco isolado `qa_control_test`) |
+| Testes | Jest + Supertest e testes isolados; integração somente por runner protegido |
 | Docs | docx |
 
 ---
@@ -86,7 +108,7 @@ qa-control-center/
 │   ├── tests/               # testes de integração (Jest + Supertest)
 │   ├── .env                 # variáveis locais (não comitar)
 │   ├── .env.example         # template
-│   ├── .env.test            # aponta para banco de teste (porta 5434)
+│   ├── .env.test            # configuração legada protegida; não usar para ensaio
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
@@ -202,26 +224,18 @@ Test Cases  →  Test Suites  →  Test Plans  →  Execute  →  Executions
 
 ## Testes automatizados
 
-Os testes rodam contra um banco **isolado** (`qa_control_test`) na porta `5434`, sem tocar nos dados de desenvolvimento.
+O fluxo anterior usava qa_control_test:5434 e npm test. Foi substituído para este
+fechamento porque esse banco contém dados a preservar. Não executar o setup Jest
+legado, nem levantar/recriar db-test como forma de preparar testes.
 
-```bash
-# Subir banco de teste (uma só vez)
-docker compose up -d db-test
+- [Comando isolado e runtime validado](backend/FEATURE-VALIDATION-STATUS.md).
+- [Runner de integração e restrições atuais](backend/DISPOSABLE-INTEGRATION.md).
+- [Ensaio independente com dados históricos sintéticos](backend/HISTORICAL-MIGRATION-REHEARSAL.md).
+- [Checklist e resultados](backend/FEATURE-HOMOLOGATION-CHECKLIST.md).
 
-# Rodar todos os testes
-cd backend
-npm test
-```
-
-O `backend/.env.test` aponta automaticamente para o banco de teste:
-
-```env
-DB_HOST=localhost
-DB_PORT=5434
-DB_USER=qauser
-DB_PASSWORD=qapass
-DB_DATABASE=qa_control_test
-```
+As execuções integradas anteriores usaram 5435, agora preservado com dados de
+homologação. O ensaio histórico usou 5436 e também permanece preservado. Não copiar
+os comandos antigos contra 5434 ou executar testes destrutivos sem nova autorização.
 
 ---
 
