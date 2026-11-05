@@ -52,7 +52,7 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 });
 
 // DELETE - Deletar test plan
-router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const deleted = await testPlansService.delete(req.params.id);
     await logAudit({ userId: req.user?.id, entityType: "test_plan", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });
@@ -83,7 +83,7 @@ router.post("/:id/suites", authorize("admin", "qa"), validate(idParamSchema, "pa
 });
 
 // DELETE - Desvincular suite de um plan
-router.delete("/:id/suites/:suiteId", authorize("admin", "qa"), validate(idAndSuiteIdSchema, "params"), async (req, res, next) => {
+router.delete("/:id/suites/:suiteId", authorize("admin"), validate(idAndSuiteIdSchema, "params"), async (req, res, next) => {
   try {
     await testPlansService.removeSuite(req.params.id, req.params.suiteId);
     res.json({ message: "Suite removida do plan" });
@@ -95,7 +95,7 @@ router.delete("/:id/suites/:suiteId", authorize("admin", "qa"), validate(idAndSu
 // POST - Executar plan
 router.post("/:id/execute", authorize("admin", "qa"), validate(idParamSchema, "params"), validate(executeSchema), async (req, res, next) => {
   try {
-    const execucao = await testPlansService.execute(req.params.id, req.body.ambiente, req.user?.id ?? null);
+    const execucao = await testPlansService.execute(req.params.id, req.user?.id ?? null);
     res.status(201).json(execucao);
   } catch (err) {
     next(err);

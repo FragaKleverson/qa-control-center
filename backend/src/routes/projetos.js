@@ -4,8 +4,8 @@ const { projectsService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema, paginationQuerySchema } = require("../validators/common");
-const { createSchema, updateSchema } = require("../validators/projetos");
+const { idParamSchema } = require("../validators/common");
+const { createSchema, updateSchema, listQuerySchema } = require("../validators/projetos");
 
 /**
  * @swagger
@@ -36,9 +36,10 @@ const { createSchema, updateSchema } = require("../validators/projetos");
  *         description: Sem token de autenticação
  */
 // GET - Listar todos os projetos (opcionalmente paginado via ?page=&limit=)
-router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
+router.get("/", validate(listQuerySchema, "query"), async (req, res, next) => {
   try {
-    const projetos = await projectsService.listAll(req.query);
+    // Express 5 expõe req.query por getter; usa os valores transformados do schema.
+    const projetos = await projectsService.listAll(listQuerySchema.parse(req.query));
     res.json(projetos);
   } catch (err) {
     next(err);

@@ -20,7 +20,12 @@ const envFile =
     ? path.join(__dirname, "../../.env.test")  // backend/.env.test
     : path.join(__dirname, "../../.env");      // backend/.env
 
-require("dotenv").config({ path: envFile });
+const integrationConfig = process.env.QA_HOMOLOGATION_MODE !== undefined
+  ? require("./homologation").readHomologationConfig(process.env)
+  : process.env.QA_INTEGRATION_MODE !== undefined
+  ? require("./integrationTarget").readIntegrationConfig(process.env)
+  : null;
+if (!integrationConfig) require("dotenv").config({ path: envFile });
 
 // ─── Validação de variáveis obrigatórias ──────────────────────────────────────
 // Apenas em dev/prod — testes usam valores definidos no jest.setup.js
@@ -52,7 +57,10 @@ module.exports = {
   isProduction: process.env.NODE_ENV === "production",
 
   // ── Banco de dados ────────────────────────────────────────────────────────
-  db: {
+  db: integrationConfig ? {
+    host: integrationConfig.host, port: integrationConfig.port, database: integrationConfig.database,
+    user: integrationConfig.user, password: integrationConfig.password,
+  } : {
     host: process.env.DB_HOST || "localhost",
     port: Number(process.env.DB_PORT) || 5433,
     database: process.env.DB_DATABASE,

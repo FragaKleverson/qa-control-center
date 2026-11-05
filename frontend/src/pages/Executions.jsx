@@ -1,8 +1,13 @@
+import ActionButton from "../components/ActionButton";
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect, useRef } from "react";
+import { ENVIRONMENTS } from "../domain/environments";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import GherkinDisplay from "../components/GherkinDisplay";
-import { executionsAPI, testSuitesAPI } from "../services/api";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
+import { executionsAPI, testSuitesAPI, projectsAPI, parsePaginationResponse } from "../services/api";
 import "./Pages.css";
 
 const STATUS_OPTIONS = [
@@ -20,9 +25,18 @@ function getStatusInfo(status) {
 }
 
 export default function Executions() {
-  const [executions, setExecutions] = useState([]);
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
+  const canDelete = user?.role === "admin";
+  const {
+    data: executions, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadExecutions, mounted,
+    query, setQuery,
+  } = usePaginatedList(executionsAPI.list);
   const [suites, setSuites] = useState([]);
-  const [filterProject, setFilterProject] = useState("");
+  const [projects, setProjects] = useState([]);
+  const [projectsError, setProjectsError] = useState("");
+  const filterProject = query.projeto_id ?? "";
   const [expandedId, setExpandedId] = useState(null);
   const [resultsMap, setResultsMap] = useState({});
   const [obsMap, setObsMap] = useState({});
@@ -36,37 +50,40 @@ export default function Executions() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
   useEffect(() => {
-    loadExecutions();
-    loadSuites();
+    const controller = new AbortController();
+    testSuitesAPI.list(undefined, { signal: controller.signal })
+      .then(parsePaginationResponse)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setSuites(data);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error(err);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    projectsAPI.list(undefined, { signal: controller.signal })
+      .then(parsePaginationResponse)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setProjects(data);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setProjectsError("Não foi possível carregar os projetos do filtro.");
+      });
+    return () => controller.abort();
   }, []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  // Busca todas as execuções com estatísticas agregadas
-  async function loadExecutions() {
-    try {
-      const data = await executionsAPI.list();
-      setExecutions(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar execuções", "error");
-    }
-  }
-
-  // Busca todas as test suites para o select do formulário de nova execução
-  async function loadSuites() {
-    try {
-      const data = await testSuitesAPI.list();
-      setSuites(data);
-    } catch (err) {
-      console.error(err);
-    }
   }
 
   // Abre/fecha o painel de test cases de uma execução; carrega resultados sob demanda
@@ -79,25 +96,29 @@ export default function Executions() {
     if (!resultsMap[executionId]) {
       setLoadingResults((prev) => ({ ...prev, [executionId]: true }));
       try {
-        const results = await executionsAPI.getResults(executionId);
+        const { data: results } = parsePaginationResponse(await executionsAPI.getResults(executionId));
+        if (!mounted.current) return;
         setResultsMap((prev) => ({ ...prev, [executionId]: results }));
         // Inicializa rascunhos de observação
         const obsInit = {};
         results.forEach((r) => { obsInit[`${executionId}-${r.projeto_id}`] = r.comentario || ""; });
         setObsMap((prev) => ({ ...prev, ...obsInit }));
       } catch (err) {
+        if (!mounted.current) return;
         console.error(err);
         showToast("Erro ao carregar test cases da execução", "error");
       } finally {
-        setLoadingResults((prev) => ({ ...prev, [executionId]: false }));
+        if (mounted.current) setLoadingResults((prev) => ({ ...prev, [executionId]: false }));
       }
     }
   }
 
   // Salva a observação de um test case
   async function handleUpdateResultComentario(execucaoId, projetoId, comentario, currentStatus) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: currentStatus, comentario });
+      if (!mounted.current) return;
       if (res.error) throw new Error(res.error);
       setResultsMap((prev) => ({
         ...prev,
@@ -106,6 +127,7 @@ export default function Executions() {
         ),
       }));
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast(err.message || "Erro ao salvar observação", "error");
     }
@@ -113,8 +135,10 @@ export default function Executions() {
 
   // Atualiza o status de um test case dentro de uma execução
   async function handleUpdateResultStatus(execucaoId, projetoId, newStatus) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.updateResult(execucaoId, projetoId, { status: newStatus });
+      if (!mounted.current) return;
       if (res.error) throw new Error(res.error);
       setResultsMap((prev) => ({
         ...prev,
@@ -124,6 +148,7 @@ export default function Executions() {
       }));
       showToast("Status atualizado!", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast(err.message || "Erro ao atualizar status", "error");
     }
@@ -131,15 +156,16 @@ export default function Executions() {
 
   // Finaliza a execução: calcula status final e bloqueia edição
   async function handleFinalizeExecution(id) {
+    if (!canWrite) return;
     try {
       const res = await executionsAPI.finalize(id);
+      if (!mounted.current) return;
       if (res.error) throw new Error(res.error);
-      // Atualiza localmente o flag finalized e status
-      setExecutions((prev) =>
-        prev.map((e) => e.id === id ? { ...e, finalized: true, status: res.status } : e)
-      );
+      // Recarrega a página atual sem sobrescrever uma navegação posterior.
+      loadExecutions();
       showToast("✅ Execução finalizada e salva! Não é possível editar os resultados.", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast(err.message || "Erro ao finalizar execução", "error");
     }
@@ -148,6 +174,7 @@ export default function Executions() {
   // Cria uma nova execução manual a partir do formulário
   async function handleRunExecution(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setLoading(true);
     if (!formData.suite_id) {
       showToast("Selecione uma test suite", "warning");
@@ -156,21 +183,24 @@ export default function Executions() {
     }
     try {
       const res = await executionsAPI.create(formData);
+      if (!mounted.current) return;
       if (res.error) throw new Error(res.error);
       showToast("Execução iniciada com sucesso!", "success");
       setFormData({ suite_id: "", ambiente: "staging", status: "pending" });
       setIsModalOpen(false);
       loadExecutions();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao executar test suite", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
   // Abre dialog de confirmação antes de deletar uma execução
   function handleDeleteExecution(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar esta execução?",
@@ -179,11 +209,13 @@ export default function Executions() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await executionsAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Execução deletada", "success");
           setResultsMap((prev) => { const next = { ...prev }; delete next[id]; return next; });
           if (expandedId === id) setExpandedId(null);
           loadExecutions();
         } catch (err) {
+          if (!mounted.current) return;
           console.error(err);
           showToast("Erro ao deletar execução", "error");
         }
@@ -209,34 +241,43 @@ export default function Executions() {
               <h2>Start New Execution</h2>
               <p>Run a test suite to verify your application</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>Run Suite</button>
+            {canWrite && (<button onClick={() => setIsModalOpen(true)}>Run Suite</button>)}
           </div>
         </div>
 
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-            <h2>Execution History ({executions.length})</h2>
+            <h2>Execution History ({isLoading || listError ? "..." : total})</h2>
             {/* Filtro por projeto */}
-            {executions.some((e) => e.nome_projeto) && (
-              <select
-                value={filterProject}
-                onChange={(e) => setFilterProject(e.target.value)}
-                style={{ padding: "8px 12px", border: "1.5px solid #d1d5db", borderRadius: "7px", fontSize: "13px", background: "#fff", color: "#374151" }}
-              >
-                <option value="">All Projects</option>
-                {[...new Set(executions.filter((e) => e.nome_projeto).map((e) => e.nome_projeto))].map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-            )}
+            <select
+              aria-label="Filtrar execuções por projeto"
+              value={filterProject}
+              onChange={(e) => setQuery({ projeto_id: e.target.value || undefined })}
+              style={{ padding: "8px 12px", border: "1.5px solid #d1d5db", borderRadius: "7px", fontSize: "13px", background: "#fff", color: "#374151" }}
+            >
+              <option value="">All Projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.titulo} (#{project.id})</option>
+              ))}
+            </select>
           </div>
-          {executions.length === 0 ? (
+          {projectsError && <p role="alert">{projectsError}</p>}
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadExecutions}>Tentar novamente</button>
+            </div>
+          ) : executions.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : executions.length === 0 && filterProject ? (
+            <p>Nenhuma execução encontrada para o projeto selecionado.</p>
+          ) : executions.length === 0 ? (
             <p>No executions yet. Start by running a test suite!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
-              {executions
-                .filter((e) => !filterProject || e.nome_projeto === filterProject)
-                .map((execution) => {
+              {executions.map((execution) => {
                 const statusInfo = getStatusInfo(execution.status);
                 const isExpanded = expandedId === execution.id;
                 const results = resultsMap[execution.id] || [];
@@ -300,13 +341,10 @@ export default function Executions() {
                       </div>
 
                       <div style={{ display: "flex", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                        <button
-                          onClick={() => toggleExpand(execution.id)}
-                          style={{ background: "#6366f1", padding: "8px 14px", fontSize: "12px" }}
-                        >
-                          {isExpanded ? "Fechar" : "Ver Cases"}
-                        </button>
-                        {!execution.finalized && (
+                        <ActionButton action="view" onClick={() => toggleExpand(execution.id)}>
+                          {isExpanded ? "Fechar" : "Visualizar casos"}
+                        </ActionButton>
+                        {canWrite && !execution.finalized && (
                           <button
                             onClick={() => handleFinalizeExecution(execution.id)}
                             style={{ background: "#10b981", padding: "8px 14px", fontSize: "12px", fontWeight: "700" }}
@@ -314,12 +352,7 @@ export default function Executions() {
                             ✔ Finalizar
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDeleteExecution(execution.id)}
-                          style={{ background: "#ef4444", padding: "8px 14px", fontSize: "12px" }}
-                        >
-                          Delete
-                        </button>
+                        {canDelete && (<ActionButton action="delete" onClick={() => handleDeleteExecution(execution.id)}>Excluir</ActionButton>)}
                       </div>
                     </div>
 
@@ -352,7 +385,7 @@ export default function Executions() {
                                         {result.titulo}
                                       </span>
                                     </div>
-                                    {execution.finalized ? (
+                                    {!canWrite || execution.finalized ? (
                                       <p style={{ margin: "4px 0 0 0", color: "#6b7280", fontSize: "12px", fontStyle: "italic" }}>
                                         {result.comentario || <span style={{ opacity: 0.5 }}>Sem observação</span>}
                                       </p>
@@ -368,13 +401,8 @@ export default function Executions() {
                                     )}
                                   </div>
                                   <div style={{ display: "flex", gap: "6px", flexShrink: 0, marginLeft: "12px" }}>
-                                    <button
-                                      onClick={() => openResultDetail(result)}
-                                      style={{ background: "#e5e7eb", color: "#374151", padding: "4px 10px", fontSize: "11px" }}
-                                    >
-                                      Ver
-                                    </button>
-                                    {execution.finalized ? (
+                                    <ActionButton action="view" onClick={() => openResultDetail(result)}>Visualizar</ActionButton>
+                                    {!canWrite || execution.finalized ? (
                                       <span style={{ background: rs.bg, color: rs.color, padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", border: "1px solid #e5e7eb" }}>
                                         {rs.label}
                                       </span>
@@ -402,11 +430,22 @@ export default function Executions() {
               })}
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={executions.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 
       {/* Modal: Criar execução manual */}
-      <Modal isOpen={isModalOpen} title="Run Test Suite" onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isModalOpen && canWrite} title="Run Test Suite" onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleRunExecution}>
           <label style={{ display: "block", marginBottom: "16px" }}>
             <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>Test Suite</span>
@@ -429,10 +468,7 @@ export default function Executions() {
               onChange={(e) => setFormData({ ...formData, ambiente: e.target.value })}
               style={{ width: "100%", padding: "12px", marginTop: "8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px" }}
             >
-              <option value="staging">Staging</option>
-              <option value="production">Production</option>
-              <option value="dev">Dev</option>
-              <option value="qa">QA</option>
+              {ENVIRONMENTS.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
           <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>

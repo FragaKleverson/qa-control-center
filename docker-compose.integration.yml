@@ -1,0 +1,22 @@
+﻿name: qa-control-integration
+services:
+  db-integration:
+    image: postgres:15
+    profiles: [integration]
+    restart: "no"
+    environment:
+      POSTGRES_DB: qa_control_integration
+      POSTGRES_USER: ${DB_USER:?Dedicated integration user required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Dedicated integration password required}
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - integration-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d qa_control_integration"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  integration-data:
+    name: qa-control-integration_pgdata

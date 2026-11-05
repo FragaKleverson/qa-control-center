@@ -3,6 +3,7 @@
  */
 
 const pool = require("../db");
+const { environmentSchema } = require("../domain/environments");
 const AppError = require("../middleware/AppError");
 const { paginate, isPaginationRequested } = require("./pagination");
 
@@ -21,17 +22,24 @@ const BASE_SQL = `SELECT e.*,
    FROM execucoes e
    LEFT JOIN test_suites ts ON ts.id = e.suite_id
    LEFT JOIN projetos p ON p.id = ts.projeto_id
-   WHERE e.deleted_at IS NULL
-   ORDER BY e.created_at DESC`;
+   WHERE e.deleted_at IS NULL`;
 const COUNT_SQL = "SELECT COUNT(*) FROM execucoes e WHERE e.deleted_at IS NULL";
 
 const executionsService = {
-  listAll: async ({ page, limit } = {}) => {
+  listAll: async ({ page, limit, projeto_id } = {}) => {
+    const params = projeto_id === undefined ? [] : [projeto_id];
+    const filter = params.length ? " AND ts.projeto_id = $1" : "";
+    const baseSql = `${BASE_SQL}${filter} ORDER BY e.created_at DESC, e.id DESC`;
+    const countSql = params.length
+      ? `SELECT COUNT(*) FROM execucoes e
+         LEFT JOIN test_suites ts ON ts.id = e.suite_id
+         WHERE e.deleted_at IS NULL${filter}`
+      : COUNT_SQL;
     if (!isPaginationRequested({ page, limit })) {
-      const result = await query(BASE_SQL);
+      const result = await query(baseSql, params);
       return result.rows;
     }
-    return paginate(query, { baseSql: BASE_SQL, countSql: COUNT_SQL, page, limit });
+    return paginate(query, { baseSql, countSql, page, limit, params });
   },
 
   getById: async (id) => {
@@ -41,6 +49,7 @@ const executionsService = {
 
   create: async (data, userId = null) => {
     const { suite_id, ambiente = "staging", status = "pending", resultado = null } = data;
+    if (!environmentSchema.safeParse(ambiente).success) throw new AppError("Ambiente invalido", 422);
     if (!suite_id) throw new Error("suite_id é obrigatório");
     const result = await query(
       "INSERT INTO execucoes (suite_id, ambiente, status, resultado, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *",

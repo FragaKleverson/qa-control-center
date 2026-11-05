@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- deps: instala dependências (inclui devDependencies, necessárias para o build do Vite) ----
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

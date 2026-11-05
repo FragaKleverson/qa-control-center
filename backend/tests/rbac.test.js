@@ -7,7 +7,7 @@
  *
  *   Aqui usamos x-test-role para testar as restrições de cada perfil:
  *     x-test-role: reader  → somente GET
- *     x-test-role: qa      → GET + POST/PUT + DELETE em execuções/suites/plans/requirements
+ *     x-test-role: qa      → GET + POST/PUT; DELETE e restauração exclusivos do Admin
  *     x-test-role: admin   → acesso total
  *
  *   Os testes de /admin/usuarios usam req.user.id = 1 (injetado pelo mock),

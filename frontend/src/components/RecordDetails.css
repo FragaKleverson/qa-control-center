@@ -1,0 +1,20 @@
+﻿.record-view-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  background: #6366f1;
+}
+.record-list-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.record-list-info { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.record-list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.record-details { min-width: 0; overflow-wrap: anywhere; }
+.record-details-fields { display: grid; gap: 16px; margin: 0 0 24px; }
+.record-details-fields dt { font-weight: 700; color: #374151; margin-bottom: 4px; }
+.record-details-fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #111827; line-height: 1.5; }
+.record-details p { margin-bottom: 12px; }
+.record-details button:focus-visible { outline: 3px solid #4f46e5; outline-offset: 3px; }
+.record-details-dialog .modal-header h2 { min-width: 0; overflow-wrap: anywhere; }
+.record-details-dialog .close-btn { flex-shrink: 0; }

@@ -4,13 +4,14 @@ const { executionsService } = require("../services");
 const { logAudit } = require("../services/auditService");
 const { validate } = require("../middleware/validate");
 const { authorize } = require("../middleware/authorize");
-const { idParamSchema, idAndProjetoIdSchema, paginationQuerySchema } = require("../validators/common");
-const { createSchema, updateSchema, updateResultSchema } = require("../validators/execucoes");
+const { idParamSchema, idAndProjetoIdSchema } = require("../validators/common");
+const { createSchema, updateSchema, updateResultSchema, listQuerySchema } = require("../validators/execucoes");
 
 // GET - Listar todas as execuções (opcionalmente paginado via ?page=&limit=)
-router.get("/", validate(paginationQuerySchema, "query"), async (req, res, next) => {
+router.get("/", validate(listQuerySchema, "query"), async (req, res, next) => {
   try {
-    const executions = await executionsService.listAll(req.query);
+    // Express 5 expõe req.query por getter; usa os valores transformados do schema.
+    const executions = await executionsService.listAll(listQuerySchema.parse(req.query));
     res.json(executions);
   } catch (err) {
     next(err);
@@ -62,7 +63,7 @@ router.put("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), 
 });
 
 // DELETE - Deletar execução
-router.delete("/:id", authorize("admin", "qa"), validate(idParamSchema, "params"), async (req, res, next) => {
+router.delete("/:id", authorize("admin"), validate(idParamSchema, "params"), async (req, res, next) => {
   try {
     const deleted = await executionsService.delete(req.params.id);
     await logAudit({ userId: req.user?.id, entityType: "execucao", entityId: parseInt(req.params.id), action: "DELETE", oldValues: deleted, ipAddress: req.ip });

@@ -6,7 +6,8 @@
 
 const request = require("supertest");
 const app = require("../src/app");
-const { clearTables, closePool, createProjeto } = require("./helpers/db");
+const { createTestUser } = require("./helpers/auth");
+const { clearTables, clearUsers, closePool, createProjeto } = require("./helpers/db");
 
 // Payload válido reutilizado nos testes de criação
 const PAYLOAD_VALIDO = {
@@ -15,6 +16,12 @@ const PAYLOAD_VALIDO = {
   feature: "Feature: Autenticação",
   cenarios: [{ nome: "Cenário 1", tipo: "Happy Path", passos: "Given x\nWhen y\nThen z" }],
 };
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
   // Garante banco limpo antes de cada teste

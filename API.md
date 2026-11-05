@@ -1,5 +1,20 @@
 # 📚 API QA Control Center
 
+## Contratos atuais da feature
+
+Este guia geral é complementado pelos contratos implementados de
+[Projects e casos legados](backend/PROJECTS-PERSISTENCE-CONTRACT.md),
+[Test Plans/Execution](backend/TEST-PLAN-LIFECYCLE.md) e
+[permissões RBAC](backend/RBAC-PERMISSIONS.md). /projects identifica o novo catálogo;
+/projetos continua identificando Test Cases, com project_id opcional. O PUT agora
+persiste cenarios informado e preserva o omitido. A execução do plano é única.
+
+Ver [estado e ambientes protegidos](backend/FEATURE-VALIDATION-STATUS.md). Exemplos
+genéricos de startup/chamadas abaixo não autorizam operações em instâncias existentes
+ou nos bancos protegidos. Para homologação usar somente o modo manual autorizado,
+com autenticação real e guardas, conforme o roteiro versionado.
+
+
 **Versão:** 1.0.0 | **Status:** ✅ Completa | **30+ endpoints**  
 **Autenticação:** JWT Bearer Token | **Documentação:** Swagger UI + OpenAPI 3.0
 

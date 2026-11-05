@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---- deps: instala apenas dependências de produção, em camada cacheável ----
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ---- production: imagem final enxuta, sem ferramentas de build, usuário não-root ----
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
 

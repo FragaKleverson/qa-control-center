@@ -1,0 +1,23 @@
+name: qa-control-history-rehearsal
+services:
+  db-history:
+    image: postgres:15
+    container_name: qa-control-history-rehearsal-db
+    profiles: [history-rehearsal]
+    restart: "no"
+    environment:
+      POSTGRES_DB: qa_control_history_rehearsal
+      POSTGRES_USER: qa_history_runner
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Exclusive local password required}
+    ports:
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - history_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U qa_history_runner -d qa_control_history_rehearsal"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+volumes:
+  history_pgdata:
+    name: qa-control-history-rehearsal_pgdata

@@ -6,7 +6,8 @@
 
 const request = require("supertest");
 const app = require("../src/app");
-const { clearTables, closePool, createPlan, createSuite, createProjeto } = require("./helpers/db");
+const { createTestUser } = require("./helpers/auth");
+const { clearTables, clearUsers, closePool, createPlan, createSuite, createProjeto } = require("./helpers/db");
 const pool = require("../src/db");
 
 const PAYLOAD_VALIDO = {
@@ -16,6 +17,12 @@ const PAYLOAD_VALIDO = {
   objetivo: "Garantir estabilidade após release",
   ambiente: "staging",
 };
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
   await clearTables();
@@ -82,7 +89,7 @@ describe("Test Plans API - Suite completa", () => {
         it("deve aceitar criação só com título", async () => {
             const res = await request(app)
                 .post("/test-plans")
-                .send({ titulo: "Plan Mínimo" });
+                .send({ titulo: "Plan Mínimo", ambiente: "staging" });
             expect(res.statusCode).toBe(201);
         });
 

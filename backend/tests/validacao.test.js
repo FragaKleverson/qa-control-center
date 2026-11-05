@@ -12,7 +12,14 @@
 
 const request = require("supertest");
 const app = require("../src/app");
-const { clearTables, closePool, createSuite } = require("./helpers/db");
+const { createTestUser } = require("./helpers/auth");
+const { clearTables, clearUsers, closePool, createSuite } = require("./helpers/db");
+
+// The injected API actor must exist even when this suite runs alone on an empty DB.
+beforeAll(async () => {
+  await clearUsers();
+  await createTestUser({ role: "admin" });
+});
 
 beforeEach(async () => {
   await clearTables();
@@ -227,10 +234,10 @@ describe("Validação POST /test-plans", () => {
     expect(res.statusCode).toBe(422);
   });
 
-  it("201 com apenas titulo (demais campos têm default)", async () => {
+  it("201 com titulo e ambiente (demais campos opcionais)", async () => {
     const res = await request(app)
       .post("/test-plans")
-      .send({ titulo: "Plan mínimo" });
+      .send({ titulo: "Plan mínimo", ambiente: "staging" });
     expect(res.statusCode).toBe(201);
     expect(res.body.escopo).toBe("");
     expect(res.body.objetivo).toBe("");

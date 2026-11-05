@@ -1,11 +1,21 @@
+import ActionButton from "../components/ActionButton";
+import { useAuth } from "../contexts/AuthContext";
 import { useState, useEffect, useRef } from "react";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { testSuitesAPI, projectsAPI } from "../services/api";
+import Pagination from "../components/Pagination";
+import usePaginatedList from "../hooks/usePaginatedList";
+import { testSuitesAPI, projectsAPI, parsePaginationResponse } from "../services/api";
 import "./Pages.css";
 
 export default function TestSuites() {
-  const [suites, setSuites] = useState([]);
+  const { user } = useAuth();
+  const canWrite = ["admin", "qa"].includes(user?.role);
+  const canDelete = user?.role === "admin";
+  const {
+    data: suites, page, pageSize, total, setPage, setPageSize,
+    isLoading, error: listError, reload: loadSuites, mounted,
+  } = usePaginatedList(testSuitesAPI.list);
   const [allProjects, setAllProjects] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCasesModalOpen, setIsCasesModalOpen] = useState(false);
@@ -17,37 +27,27 @@ export default function TestSuites() {
   const [toast, setToast] = useState({ message: "", type: "" });
   const [confirmState, setConfirmState] = useState({ isOpen: false, message: "", onConfirm: null, danger: true });
 
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
   useEffect(() => {
-    loadSuites();
-    loadProjects();
+    const controller = new AbortController();
+    projectsAPI.list(undefined, { signal: controller.signal })
+      .then(parsePaginationResponse)
+      .then(({ data }) => {
+        if (!controller.signal.aborted) setAllProjects(data);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) console.error(err);
+      });
+    return () => controller.abort();
   }, []);
 
   // Exibe uma notificação temporária por 3 segundos
   function showToast(message, type = "info") {
+    if (!mounted.current) return;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  // Busca todas as test suites da API
-  async function loadSuites() {
-    try {
-      const data = await testSuitesAPI.list();
-      setSuites(data);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar test suites", "error");
-    }
-  }
-
-  // Busca todos os test cases (projetos) para exibir no modal de vínculo
-  async function loadProjects() {
-    try {
-      const data = await projectsAPI.list();
-      setAllProjects(data);
-    } catch (err) {
-      console.error(err);
-    }
   }
 
   // Abre o modal de gestão de test cases de uma suite e carrega os vinculados
@@ -56,8 +56,10 @@ export default function TestSuites() {
     setIsCasesModalOpen(true);
     try {
       const cases = await testSuitesAPI.getCases(suite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao carregar test cases", "error");
     }
@@ -65,12 +67,16 @@ export default function TestSuites() {
 
   // Vincula um test case à suite selecionada
   async function handleAddCase(projetoId) {
+    if (!canWrite) return;
     try {
       await testSuitesAPI.addCase(selectedSuite.id, projetoId);
+      if (!mounted.current) return;
       const cases = await testSuitesAPI.getCases(selectedSuite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
       showToast("Test case adicionado à suite!", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao adicionar test case", "error");
     }
@@ -78,12 +84,16 @@ export default function TestSuites() {
 
   // Remove o vínculo de um test case da suite selecionada
   async function handleRemoveCase(projetoId) {
+    if (!canDelete) return;
     try {
       await testSuitesAPI.removeCase(selectedSuite.id, projetoId);
+      if (!mounted.current) return;
       const cases = await testSuitesAPI.getCases(selectedSuite.id);
-      setSuiteCases(cases);
+      if (!mounted.current) return;
+      setSuiteCases(parsePaginationResponse(cases).data);
       showToast("Test case removido da suite", "success");
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao remover test case", "error");
     }
@@ -92,6 +102,7 @@ export default function TestSuites() {
   // Cria uma nova test suite via API; valida campo nome
   async function handleCreateSuite(e) {
     e.preventDefault();
+    if (!canWrite) return;
     setLoading(true);
     if (!formData.nome.trim()) {
       showToast("Preencha o nome", "warning");
@@ -100,21 +111,24 @@ export default function TestSuites() {
     }
     try {
       const res = await testSuitesAPI.create(formData);
+      if (!mounted.current) return;
       if (!res.id) { showToast("Erro ao criar suite", "error"); setLoading(false); return; }
       showToast("Test Suite criada com sucesso!", "success");
       setFormData({ nome: "", descricao: "" });
       setIsModalOpen(false);
       loadSuites();
     } catch (err) {
+      if (!mounted.current) return;
       console.error(err);
       showToast("Erro ao criar test suite", "error");
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   }
 
   // Abre dialog de confirmação antes de deletar uma suite
   function handleDeleteSuite(id) {
+    if (!canDelete) return;
     setConfirmState({
       isOpen: true,
       message: "Deseja deletar esta test suite?",
@@ -123,9 +137,11 @@ export default function TestSuites() {
         setConfirmState((s) => ({ ...s, isOpen: false }));
         try {
           await testSuitesAPI.delete(id);
+          if (!mounted.current) return;
           showToast("Test Suite deletada", "success");
           loadSuites();
         } catch (err) {
+          if (!mounted.current) return;
           console.error(err);
           showToast("Erro ao deletar test suite", "error");
         }
@@ -148,47 +164,57 @@ export default function TestSuites() {
               <h2>Create New Test Suite</h2>
               <p>Create a new suite to group related test cases</p>
             </div>
-            <button onClick={() => setIsModalOpen(true)}>+ New Suite</button>
+            {canWrite && (<button onClick={() => setIsModalOpen(true)}>+ New Suite</button>)}
           </div>
         </div>
 
         <div className="card">
-          <h2>Your Test Suites ({suites.length})</h2>
-          {suites.length === 0 ? (
+          <h2>Your Test Suites ({isLoading || listError ? "..." : total})</h2>
+          {isLoading ? (
+            <p role="status">Carregando registros...</p>
+          ) : listError ? (
+            <div role="alert">
+              <p>Não foi possível carregar os registros: {listError}</p>
+              <button onClick={loadSuites}>Tentar novamente</button>
+            </div>
+          ) : suites.length === 0 && total > 0 ? (
+            <p>Nenhum registro nesta página.</p>
+          ) : suites.length === 0 ? (
             <p>No test suites created yet. Create one to get started!</p>
           ) : (
             <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
               {suites.map((suite) => (
                 <div key={suite.id} style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: "12px" }}>
                     <div style={{ flex: 1 }}>
                       <h3 style={{ margin: "0 0 4px 0", color: "#111827" }}>{suite.nome}</h3>
                       <p style={{ margin: "0 0 8px 0", color: "#6b7280", fontSize: "14px" }}>{suite.descricao}</p>
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        onClick={() => openCasesModal(suite)}
-                        style={{ background: "#6366f1", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Manage Cases
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSuite(suite.id)}
-                        style={{ background: "#ef4444", padding: "8px 16px", fontSize: "12px" }}
-                      >
-                        Delete
-                      </button>
+                    <div className="action-buttons">
+                      <ActionButton action="view" onClick={() => openCasesModal(suite)}>Visualizar casos</ActionButton>
+                      {canDelete && (<ActionButton action="delete" onClick={() => handleDeleteSuite(suite.id)}>Excluir</ActionButton>)}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+
+          <Pagination
+            loading={isLoading}
+            error={Boolean(listError)}
+            empty={suites.length === 0}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </div>
 
       {/* Modal: Criar suite */}
-      <Modal isOpen={isModalOpen} title="Create New Test Suite" onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isModalOpen && canWrite} title="Create New Test Suite" onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleCreateSuite}>
           <input
             type="text"
@@ -234,12 +260,7 @@ export default function TestSuites() {
                         {tc.cenarios && Array.isArray(tc.cenarios) ? `${tc.cenarios.length} cenários` : ""}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handleRemoveCase(tc.id)}
-                      style={{ background: "#ef4444", padding: "4px 12px", fontSize: "12px" }}
-                    >
-                      Remover
-                    </button>
+                    {canDelete && (<ActionButton action="delete" onClick={() => handleRemoveCase(tc.id)}>Excluir vínculo</ActionButton>)}
                   </div>
                 ))}
               </div>
@@ -263,12 +284,12 @@ export default function TestSuites() {
                         {tc.cenarios && Array.isArray(tc.cenarios) ? `${tc.cenarios.length} cenários` : ""}
                       </span>
                     </div>
-                    <button
+                    {canWrite && (<button
                       onClick={() => handleAddCase(tc.id)}
                       style={{ background: "#6366f1", padding: "4px 12px", fontSize: "12px" }}
                     >
                       + Adicionar
-                    </button>
+                    </button>)}
                   </div>
                 ))}
               </div>

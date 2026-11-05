@@ -18,29 +18,29 @@ export default function Dashboard() {
   const [toast, setToast] = useState({ message: "", type: "" });
 
   useEffect(() => {
+    function showToast(message, type = "info") {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast({ message, type });
+      toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
+    }
+
+    async function loadDashboard() {
+      try {
+        const dashData = await statsAPI.getDashboard();
+        setStatsData(dashData.stats || {
+          totalProjects: 0, totalExecutions: 0,
+          testCases: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0, pending: 0 }
+        });
+        setProjects(dashData.recentProjects || []);
+        setExecutions(dashData.recentExecutions || []);
+      } catch (err) {
+        console.error(err);
+        showToast("Erro ao carregar dashboard", "error");
+      }
+    }
+
     loadDashboard();
   }, []);
-
-  function showToast(message, type = "info") {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message, type });
-    toastTimerRef.current = setTimeout(() => setToast({ message: "", type: "" }), 3000);
-  }
-
-  async function loadDashboard() {
-    try {
-      const dashData = await statsAPI.getDashboard();
-      setStatsData(dashData.stats || {
-        totalProjects: 0, totalExecutions: 0,
-        testCases: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0, pending: 0 }
-      });
-      setProjects(dashData.recentProjects || []);
-      setExecutions(dashData.recentExecutions || []);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao carregar dashboard", "error");
-    }
-  }
 
   // Abre o modal de detalhe de um item (projeto, test case ou execução)
   const openModal = (type, item) => {
