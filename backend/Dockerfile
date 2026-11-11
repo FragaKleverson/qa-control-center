@@ -15,7 +15,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY src ./src
 COPY templates ./templates
-COPY prisma/schema.prisma prisma/migrations ./prisma/
+COPY prisma.config.ts ./prisma.config.ts
+COPY prisma/schema.prisma ./prisma/schema.prisma
+COPY prisma/migrations/ ./prisma/migrations/
 
 # Usuário não-root — evita rodar o processo Node como root dentro do container
 RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs \
