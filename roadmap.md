@@ -288,12 +288,85 @@ Os testes isolados do módulo de API frontend usam Node com --experimental-vm-mo
 
 ## 17. Testes Frontend
 
+**Status atual: CONCLUÍDO COM RESSALVAS — 13/11/2026, por aceite explícito do responsável.** Escopo mínimo aceito: regressão automatizada, lint, build e auditorias estáticas de segurança e performance. Não equivale a segurança integrada ou performance em navegador validadas; a Fase 5 permanece aberta.
+
 ### Implementar
 
 * Componentes
 * Fluxos críticos
 * Teste Carga / Performace 
 * Testes de segurança
+
+### Consolidação do item 17 — 13/11/2026
+
+**Registro histórico: status PARCIAL na consolidação inicial.** Os marcadores e as pendências daquela revisão foram preservados abaixo; o aceite posterior consta na seção de encerramento com ressalvas. BUG-001 a BUG-004 permanecem atuais e pendentes. Não corrigir os defeitos nesta etapa.
+
+#### Evidências de validação
+
+- [x] Regressão conjunta frontend: **15/15 suítes e 220/220 testes aprovados**, sem reprovados ou ignorados; código de saída 0. Inclui 14 suítes em `frontend/tests` e `backend/tests/unit/frontend-api-pagination.test.js`.
+- Ambiente: WSL Ubuntu, Node Linux **26.13.0**, Jest **30.4.2**, executor temporário Linux; sem cobertura global, banco ou serviços externos.
+- Evidências: `/tmp/qa-frontend-regression.lgmn1x3q/{summary.json,jest-results.json,execution.log,preservation-check.json}`. Arquivos, HEAD, índice e estado do Git preservados.
+- [x] ESLint frontend aprovado com a configuração atual: **53 arquivos, 0 erros, 0 avisos**, `--max-warnings 0`, sem fix/cache; ESLint **10.2.1**, Node Linux **26.13.0**, código de saída 0.
+- Evidências ESLint: `/tmp/qa-frontend-eslint.e_i8zofq/{summary.json,eslint-results.json,execution.log,preservation-check.json}`. Nenhum arquivo do projeto foi alterado pela validação.
+- As aprovações não significam que os quatro problemas foram corrigidos. Os testes de caracterização registram limitações existentes, não aprovação funcional desses comportamentos. Artefatos em `/tmp` são temporários; preservar/exportar as evidências antes de sua remoção, sob autorização.
+
+#### Backlog de problemas conhecidos — item 17
+
+Prioridades sugeridas para triagem futura; todos os problemas permanecem pendentes. Esta seção centraliza os quatro registros, sem criar outro acompanhamento independente.
+
+| ID / componente | Descrição e impacto | Prioridade sugerida | Evidência existente | Critério de correção futura | Status |
+|---|---|---|---|---|---|
+| BUG-001 — `frontend/src/pages/TestSuites.jsx` | Respostas antigas de carregamento/mutação podem sobrescrever os casos da suíte atual após trocar a seleção: a verificação de montagem não identifica a suíte/requisição vigente. Pode exibir vínculos no contexto errado e induzir operações incorretas. | P1 | Leitura de `openCasesModal`, `handleAddCase` e `handleRemoveCase`; o teste de resposta após desmontagem em `frontend/tests/testSuites.test.cjs` não reproduz a troca A → B. | Reproduzir A → B com respostas fora de ordem; ignorar resultados e feedback de sessões antigas sem alterar dados ou seleção de B; adicionar regressão específica. | PENDENTE — identificado por leitura, pendente de reprodução específica. |
+| BUG-002 — `frontend/src/pages/Executions.jsx` | Callbacks antigos de status/comentário continuam chamando a API após finalização; os handlers verificam papel, mas não o estado finalizado. Gera tentativas indevidas e depende da proteção do servidor. | P2 | Dois cenários de callbacks antigos em `frontend/tests/executions.test.cjs`, com rejeição simulada da API. A proteção real do backend não é comprovada por esses testes. | Conferir o estado atual antes da edição, sem chamada indevida após finalização; preservar a proteção backend e validá-la separadamente em destino autorizado. Atualizar a caracterização para regressão do comportamento corrigido. | PENDENTE — comportamento caracterizado por testes. |
+| BUG-003 — `frontend/src/pages/Requirements.jsx` | Ao receber JSON sem `id`, chama `res.text()`, incompatível com o retorno do cliente HTTP. Produz exceção interna e mensagem genérica, embora não anuncie sucesso. | P2 | Leitura de `handleCreateRequirement` e `requirementsAPI.create`; cenário JSON sem `id` em `frontend/tests/requirements.test.cjs`. | Tratar explicitamente resposta JSON inválida sem chamar `text()`; manter campos/modal, informar erro e não anunciar sucesso ou recarregar a lista. | PENDENTE — comportamento caracterizado. |
+| BUG-004 — `frontend/src/pages/Reports.jsx` | Exceção em `a.click()` desvia o fluxo antes de `a.remove()` e `URL.revokeObjectURL()`. Deixa link temporário e URL Blob sem limpeza, com retenção de recursos. | P2 | Cenário de exceção no clique em `frontend/tests/reports.test.cjs`: ausência de remoção/revogação e apresentação de erro. | Garantir limpeza do link e revogação da URL criada também na exceção, sem sucesso indevido; testar sucesso e falhas após criação da URL. | PENDENTE — comportamento caracterizado. |
+
+#### Histórico das validações pendentes antes do aceite com ressalvas
+
+- [ ] **Build frontend atual no WSL:** verificar dependências Linux, desabilitar leitura de `.env` e gerar artefatos exclusivamente em `/tmp`; não instalar dependências automaticamente.
+- [ ] **Avaliação mínima de segurança:** revisar sessão/401, permissões e efeitos dos handlers; explicitar os limites de mocks e registrar a triagem dos defeitos. Aceitação ou adiamento de riscos exige decisão explícita; não presumir que os testes isolados comprovam segurança integrada.
+- [ ] **Avaliação mínima de performance:** definir e aprovar cenários, massas sintéticas, ambiente, repetições e limites de aceite; medir renderização/listagem/relatórios de forma reproduzível. Tempo do Jest não é métrica de performance do produto.
+
+ESLint e regressão conjunta possuem evidência atual e não são pendências desta consolidação. Novas alterações futuras podem exigir revalidação. Os critérios mínimos de segurança e performance ainda precisam ser definidos antes de concluir o item 17.
+
+O item 18 será realizado por último, em repositório Git separado, provisoriamente `qa-control-center-e2e`. Não instalar Playwright ou criar E2E no repositório principal; não criar o repositório separado nesta etapa. Essa decisão não elimina as validações pendentes do item 17 nem conclui a Fase 5.
+
+### Encerramento do item 17 com ressalvas — 13/11/2026
+
+O responsável aceitou explicitamente regressão automatizada, lint, build e auditorias estáticas como escopo mínimo desta etapa. Este aceite supera o status parcial e o checklist histórico acima; não declara corrigidos os defeitos nem executadas as avaliações dinâmicas originalmente propostas. Não houve correção funcional nesta consolidação.
+
+#### Evidências aceitas no encerramento
+
+- [x] **Regressão conjunta:** 15/15 suítes e 220/220 testes PASS, nenhum reprovado/ignorado, código 0; WSL Ubuntu, Node Linux 26.13.0 e Jest 30.4.2. Evidências: `/tmp/qa-frontend-regression.lgmn1x3q/`.
+- [x] **ESLint:** 53 arquivos, 0 erros e 0 avisos, código 0; configuração vigente, `--max-warnings 0`, sem fix/cache. Evidências: `/tmp/qa-frontend-eslint.e_i8zofq/`.
+- [x] **Build Vite 8.0.10 isolado:** PASS, código 0, 63 módulos transformados, cinco artefatos; execução total de 8,920 s. Dependências temporárias e guardas de isolamento, sem `.env`, saída/cache em `/tmp`. Evidências: `/tmp/qa-frontend-build-execution.kf0lor3e/{summary.json,execution.log,preservation-check.json}`; artefatos em `/tmp/qa-frontend-build-deps.1d4v0z1u/dist/`. Aviso de tempo em plugins devido principalmente à guarda temporária; não usado como desempenho do produto.
+- [x] **Auditoria estática de segurança:** rotas, sessão/logout, tokens, respostas 401/403, RBAC visual, HTML dinâmico e indicadores de segredos revisados. Não foi identificada vulnerabilidade crítica comprovada; nenhum indicador de segredo nos padrões pesquisados em fontes/artefatos e nenhum uso de HTML dinâmico inseguro encontrado. Não é certificação de ausência de vulnerabilidades, segredos ou validação integrada; arquivos `.env` não foram lidos.
+- [x] **Avaliação estática de performance:** cinco artefatos, 364.523 bytes no total; JS 338.038 bytes e CSS 11.473 bytes, com cerca de 96,62 kB/3,02 kB gzip no log do Vite. Imports de páginas, paginação e coleções auxiliares revisados. Sem medição de renderização, interação, memória ou rede em navegador; tempo de build/Jest não mede performance da interface.
+
+A regressão aprovada inclui testes de caracterização dos defeitos existentes. BUG-001 a BUG-004 continuam PENDENTES, com prioridades e critérios inalterados. A auditoria estática e o aceite das ressalvas não comprovam a proteção real do backend nem corrigem os problemas. Evidências em `/tmp` são efêmeras; sua preservação externa exige autorização própria.
+
+#### Achados adicionais de segurança e performance
+
+| ID / prioridade sugerida | Evidência | Impacto | Recomendação futura | Status |
+|---|---|---|---|---|
+| SEC-01 — P2 | `AuthProvider.jsx` mantém token/perfil em `localStorage`; `isAuthenticated` usa presença do token; `ProtectedRoute.jsx` consome esse estado. | Token acessível a JavaScript em caso de XSS; perfil local pode alterar controles visuais. Não representa autorização do servidor. | Revisar estratégia de sessão e validar expiração/identidade; manter autorização obrigatória no backend. | PENDENTE — risco identificado por análise estática. |
+| SEC-02 — P2 | `AuthProvider.logout` limpa somente armazenamento/estado; o cliente frontend não chama revogação backend. | Encerrar a sessão visual não comprova invalidar um token previamente obtido. | Definir contrato de logout e integrar revogação quando aplicável; validar efeito real no servidor separadamente. | PENDENTE — logout local identificado; revogação backend não comprovada. |
+| SEC-03 — P2 | Inicialização de `AuthProvider.jsx` usa `JSON.parse` do usuário armazenado sem tratar conteúdo inválido. | Armazenamento malformado pode interromper a inicialização da interface. | Tratar sessão inválida sem falha não capturada e adicionar regressão específica. | PENDENTE — risco identificado por análise estática. |
+| SEC-04 — P2 para implantação | `services/api.js` possui fallback `http://localhost:3001`, também encontrado no artefato produzido sem `.env`. | O build de validação não define um destino HTTPS de implantação; pode apontar para serviço local incorreto se distribuído sem configuração adequada. | Definir/verificar URL apropriada no build de implantação; não tratar este artefato como release homologada. | PENDENTE — configuração de implantação a validar. |
+| PERF-01 — P3 | `AppRoutes.jsx` importa as páginas antecipadamente, sem lazy loading por rota; build gerou um bundle JS principal. | Todas as páginas participam da carga inicial; custo depende do dispositivo e da rede, ainda não medido. | Medir antes de decidir divisão por rota; adotar lazy loading somente se justificado. | PENDENTE — risco estático, sem medição em navegador. |
+| PERF-02 — P2 | Listagens principais usam `usePaginatedList`, mas seletores auxiliares e resultados gerados podem carregar/renderizar coleções completas. | Grandes volumes podem elevar transferência, memória e trabalho de renderização. | Medir com massas representativas e definir limites; paginar/limitar onde necessário. | PENDENTE — risco estático de volume. |
+
+#### Validações futuras e limites do aceite
+
+- [ ] Validar segurança integrada em ambiente autorizado: autenticação/autorização real, 401/403, logout/revogação e sessão, sem confundir restrição visual com barreira de segurança do servidor.
+- [ ] Definir massas, cenários, ambiente e limites de aceite e executar testes dinâmicos de performance em navegador, incluindo renderização, interação, memória e rede. A avaliação estática aceita nesta etapa não substitui essas medições.
+- [ ] Tratar o backlog BUG-001 a BUG-004 e SEC-01 a SEC-04/PERF-01 a PERF-02 em entregas futuras autorizadas; não reclassificar pendências como corrigidas pela aprovação dos testes.
+
+Essas ressalvas foram aceitas para concluir somente o item 17 no escopo mínimo acima. O item 18 permanece PENDENTE: Playwright E2E será realizado posteriormente, por último, no repositório separado provisoriamente denominado `qa-control-center-e2e`. Não instalar Playwright nem criar testes E2E no repositório principal. O próximo passo é planejar o escopo, contratos, dados sintéticos e isolamento do E2E, sem criar o novo repositório ou executar testes sem autorização.
+
+#### Critérios da Fase 5 ainda não atendidos
+
+A **Fase 5 NÃO está concluída**. Além do item 18, permanecem o cenário integrado de desempate/agregados em `backend/tests/relatorios-stats.test.js` e a cobertura mínima backend: a última medição registrada (22 suítes/537 testes) foi 59,11% statements, 52,63% branches, 58,36% functions e 58,47% lines, frente aos pisos 70/50/65/70. Statements, functions e lines continuam abaixo do mínimo; o marcador histórico do item 16 não comprova seu atendimento atual. Evidência histórica dessa medição: `/tmp/qa-unit-coverage-final.ki8kats2/`. Carga/performance backend permanece adiada a pedido, sem autorização implícita para retomada. Não há nova execução backend nesta atualização.
 
 ---
 
