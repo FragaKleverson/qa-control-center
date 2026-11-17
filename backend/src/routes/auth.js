@@ -16,53 +16,7 @@ function requireRegisterToken(req, res, next) {
   next();
 }
 
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Registrar novo usuário
- *     tags:
- *       - Autenticação
- *     parameters:
- *       - in: header
- *         name: x-register-token
- *         required: true
- *         schema:
- *           type: string
- *         description: Token de registro (valor de REGISTER_TOKEN no .env)
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               nome:
- *                 type: string
- *                 example: João Silva
- *               email:
- *                 type: string
- *                 example: joao@empresa.com
- *               password:
- *                 type: string
- *                 example: SenhaForte@123
- *     responses:
- *       201:
- *         description: Usuário criado com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                 nome:
- *                   type: string
- *                 email:
- *                   type: string
- *       403:
- *         description: Token de registro inválido
- */
+
 // Ordem: 1) rate limit → 2) token check → 3) validação body → 4) handler
 router.post("/register", authRegisterLimiter, requireRegisterToken, validate(registerSchema), async (req, res, next) => {
   try {
@@ -73,50 +27,7 @@ router.post("/register", authRegisterLimiter, requireRegisterToken, validate(reg
   }
 });
 
-/**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Fazer login e receber JWT
- *     tags:
- *       - Autenticação
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: usuario@empresa.com
- *               password:
- *                 type: string
- *                 example: SenhaForte@123
- *     responses:
- *       200:
- *         description: Login bem-sucedido. Copie o token para autorização.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *                   description: JWT token. Use em Authorization header como "Bearer TOKEN"
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     nome:
- *                       type: string
- *                     email:
- *                       type: string
- *       401:
- *         description: Email ou senha inválidos
- */
+
 router.post("/login", authLoginLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const result = await authService.login(req.body);
@@ -126,21 +37,7 @@ router.post("/login", authLoginLimiter, validate(loginSchema), async (req, res, 
   }
 });
 
-/**
- * @swagger
- * /auth/logout:
- *   post:
- *     summary: Encerrar sessão (revogar token JWT)
- *     tags:
- *       - Autenticação
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Logout realizado. O token não poderá mais ser usado.
- *       401:
- *         description: Token ausente ou inválido
- */
+
 // authMiddleware aplicado inline para funcionar em qualquer NODE_ENV
 router.post("/logout", authMiddleware, async (req, res, next) => {
   try {
@@ -151,27 +48,7 @@ router.post("/logout", authMiddleware, async (req, res, next) => {
   }
 });
 
-/**
- * @swagger
- * /auth/forgot-password:
- *   post:
- *     summary: Solicitar redefinição de senha
- *     tags:
- *       - Autenticação
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: usuario@empresa.com
- *     responses:
- *       200:
- *         description: Resposta genérica (não revela se o e-mail existe)
- */
+
 router.post("/forgot-password", passwordResetLimiter, validate(forgotPasswordSchema), async (req, res, next) => {
   try {
     const rawToken = await authService.forgotPassword(req.body.email);
@@ -190,31 +67,7 @@ router.post("/forgot-password", passwordResetLimiter, validate(forgotPasswordSch
   }
 });
 
-/**
- * @swagger
- * /auth/reset-password:
- *   post:
- *     summary: Redefinir senha com token
- *     tags:
- *       - Autenticação
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               token:
- *                 type: string
- *               password:
- *                 type: string
- *                 example: NovaSenha@456
- *     responses:
- *       200:
- *         description: Senha redefinida com sucesso
- *       400:
- *         description: Token inválido, expirado ou já utilizado
- */
+
 router.post("/reset-password", validate(resetPasswordSchema), async (req, res, next) => {
   try {
     await authService.resetPassword(req.body.token, req.body.password);
@@ -225,3 +78,289 @@ router.post("/reset-password", validate(resetPasswordSchema), async (req, res, n
 });
 
 module.exports = router;
+/**
+ * @openapi
+ * {
+ *   "/auth/register": {
+ *     "post": {
+ *       "tags": [
+ *         "Autenticação"
+ *       ],
+ *       "operationId": "post_auth_register",
+ *       "summary": "Cadastrar usuário",
+ *       "description": "Exige x-register-token, não Bearer. Primeiro usuário recebe admin; seguintes qa; papel enviado no body é descartado. Bootstrap por contagem não serializa concorrência. E-mail normalizado; bcrypt; duplicidade 409.",
+ *       "security": [
+ *         {
+ *           "registerToken": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "201": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/PublicUser"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "409": {
+ *           "$ref": "#/components/responses/Http409"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [],
+ *       "x-business-rules": [
+ *         "RN-001"
+ *       ],
+ *       "x-source": "backend/src/routes/auth.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/RegisterInput"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/auth/login": {
+ *     "post": {
+ *       "tags": [
+ *         "Autenticação"
+ *       ],
+ *       "operationId": "post_auth_login",
+ *       "summary": "Autenticar",
+ *       "description": "Validator exige email válido e password não vazio; campos inválidos 422. Serviço lowercase/trim do e-mail e bcrypt.compare mesmo sem usuário; usuário inexistente/senha incorreta 401 genérico. Não aceita role do cliente; JTI único.",
+ *       "security": [],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/LoginResponse"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [],
+ *       "x-business-rules": [
+ *         "RN-002",
+ *         "RN-003"
+ *       ],
+ *       "x-source": "backend/src/routes/auth.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/LoginInput"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/auth/logout": {
+ *     "post": {
+ *       "tags": [
+ *         "Autenticação"
+ *       ],
+ *       "operationId": "post_auth_logout",
+ *       "summary": "Revogar token atual",
+ *       "description": "Auth inline inclusive em test. Registra JTI/expiração, limpa revogações expiradas. Tokens legados sem JTI não são revogados. Botão frontend é somente local; não chama este endpoint.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Message"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-004"
+ *       ],
+ *       "x-source": "backend/src/routes/auth.js"
+ *     }
+ *   },
+ *   "/auth/forgot-password": {
+ *     "post": {
+ *       "tags": [
+ *         "Autenticação"
+ *       ],
+ *       "operationId": "post_auth_forgot_password",
+ *       "summary": "Solicitar redefinição",
+ *       "description": "Mensagem genérica; token bruto só fora de produção e com usuário existente. Hash SHA-256 e validade no banco; invalida tokens anteriores não usados. Envio de e-mail NÃO implementado.",
+ *       "security": [],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/ForgotResponse"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [],
+ *       "x-business-rules": [
+ *         "RN-005"
+ *       ],
+ *       "x-source": "backend/src/routes/auth.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ForgotInput"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/auth/reset-password": {
+ *     "post": {
+ *       "tags": [
+ *         "Autenticação"
+ *       ],
+ *       "operationId": "post_auth_reset_password",
+ *       "summary": "Redefinir senha",
+ *       "description": "Token omitido/vazio e senha inválida: 422; token fornecido não encontrado/usado/expirado: 400. Atualiza hash da senha e uso do token sem transação abrangente; não revoga todos os JWTs anteriores.",
+ *       "security": [],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Message"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [],
+ *       "x-business-rules": [
+ *         "RN-005"
+ *       ],
+ *       "x-source": "backend/src/routes/auth.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ResetInput"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ */

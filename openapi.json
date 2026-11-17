@@ -2,21 +2,60 @@
   "openapi": "3.0.0",
   "info": {
     "title": "QA Control Center API",
-    "description": "API para gerenciar projetos, testes, execuções e relatórios de QA.\n\n## 🔐 FLUXO DE AUTENTICAÇÃO COMPLETO\n\n### 1️⃣ Obter REGISTER_TOKEN (uma única vez)\n- Este token está em seu arquivo `.env` (variável `REGISTER_TOKEN`)\n- Use para registrar novos usuários\n- Mantenha seguro!\n\n### 2️⃣ Registrar Usuário (se novo)\n1. Abra o endpoint `POST /auth/register`\n2. No header `x-register-token`, cole o REGISTER_TOKEN do .env\n3. Execute com dados de novo usuário (nome, email, password)\n4. Você receberá confirmação do novo usuário\n\n### 3️⃣ Fazer Login\n1. Abra o endpoint `POST /auth/login`\n2. Execute com email e password do usuário registrado\n3. Na resposta, copie o campo `token` (JWT)\n\n### 4️⃣ Autorizar no Swagger\n1. Clique no botão verde \"Authorize\" (topo direito)\n2. Cole apenas o token JWT (sem \"Bearer\")\n3. Clique em \"Authorize\"\n\n### 5️⃣ Usar Endpoints Protegidos\n- Agora todos endpoints protegidos usarão o JWT automaticamente\n- Token é persistente até refresh da página\n\n## 📝 Endpoints Públicos\n- `POST /auth/register` (requer x-register-token header)\n- `POST /auth/login`\n\n## 🔒 Endpoints Protegidos (requerem JWT)\n- Todos os outros (Projetos, Suites, Testes, Execuções, etc)\n\n## 🚀 PARA POSTMAN\nUse a Collection incluída! Ela tem automação que:\n- Salva register_token, jwt_token em variáveis\n- Extrai JWT automaticamente do login\n- Injeta JWT em todos endpoints protegidos",
     "version": "1.0.0",
+    "description": "Contrato HTTP implementado. /projects é catálogo independente; /projetos são casos legados. Perfis admin/qa/reader; NODE_ENV=test injeta identidade em rotas de negócio e não representa composição segura de implantação. Análise documental não é homologação. Regras RN-* remetem a docs/regras-de-negocio.md. Erros 5xx não garantem rollback; constraints dependem do schema efetivamente aplicado.",
     "contact": {
       "name": "QA Team",
-      "url": "http://github.com/FragaKleverson/qa-control-center"
+      "url": "https://github.com/FragaKleverson/qa-control-center"
     }
   },
   "servers": [
     {
       "url": "http://localhost:3001",
-      "description": "Desenvolvimento"
+      "description": "Desenvolvimento local; ajuste à implantação autorizada. Não representa produção disponível."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autenticação"
     },
     {
-      "url": "https://api.qa-control.com",
-      "description": "Produção"
+      "name": "Administração"
+    },
+    {
+      "name": "Projects"
+    },
+    {
+      "name": "Test Cases (legado)"
+    },
+    {
+      "name": "Requirements"
+    },
+    {
+      "name": "Test Suites"
+    },
+    {
+      "name": "Test Plans"
+    },
+    {
+      "name": "Execuções"
+    },
+    {
+      "name": "Relatórios"
+    },
+    {
+      "name": "Dashboard"
+    },
+    {
+      "name": "Saúde"
+    },
+    {
+      "name": "Documentação"
     }
   ],
   "components": {
@@ -25,238 +64,5971 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Cole o token recebido do login aqui. Clique em Authorize para usar em todas requisições."
+        "description": "JWT de login; expiração configurada; blocklist consultada quando há JTI. Papel no token pode ficar desatualizado."
+      },
+      "registerToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-register-token",
+        "description": "Token configurado de cadastro; não é JWT nem convite individual."
       }
     },
     "schemas": {
-      "User": {
+      "Error": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "created_at": { "type": "string", "format": "date-time" }
+          "error": {
+            "type": "string"
+          },
+          "detalhes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campo": {
+                  "type": "string"
+                },
+                "mensagem": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "campo",
+                "mensagem"
+              ]
+            }
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "description": "Erros comuns. detalhes aparece nas rejeições Zod; respostas de serviço/driver normalmente contêm apenas error."
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "Environment": {
+        "type": "string",
+        "enum": [
+          "staging",
+          "production",
+          "development",
+          "homologação"
+        ]
+      },
+      "ExecutionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "in_progress",
+          "running",
+          "passed",
+          "failed",
+          "blocked",
+          "completed",
+          "skipped"
+        ]
+      },
+      "JsonValue": {
+        "description": "Qualquer valor JSON: objeto, array, string, número finito, booleano ou null; sem shape obrigatório de cenário. Omitido no PUT preserva o valor."
+      },
+      "CoercedPositiveId": {
+        "description": "Entrada convertida por Number() do z.coerce.number(); resultado deve ser inteiro positivo. Strings numéricas e outros valores coercíveis podem ser aceitos (por exemplo true vira 1). Não confundir com project_id estrito do caso.",
+        "x-normalized-schema": {
+          "type": "integer",
+          "minimum": 1
         }
       },
-      "Projeto": {
+      "SqlCount": {
+        "oneOf": [
+          {
+            "type": "integer",
+            "nullable": true
+          },
+          {
+            "type": "string",
+            "pattern": "^-?[0-9]+$"
+          }
+        ],
+        "description": "COUNT/SUM bruto do driver pg pode ser string decimal; SUM sem linhas pode ser null."
+      },
+      "PublicUser": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "description": { "type": "string" },
-          "status": { "type": "string" },
-          "created_at": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "qa",
+              "reader"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Campos públicos: login/changeRole não incluem created_at; listagem/cadastro incluem. Sem password_hash."
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT com sub/email/name/role/jti e expiração configurada."
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "integer",
+            "nullable": true
+          },
+          "nome": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "description": "Catálogo independente projects. Não é o caso legado de /projetos."
+      },
+      "TestCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "integer",
+            "nullable": true
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "feature": {
+            "type": "string",
+            "nullable": true
+          },
+          "cenarios": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "project_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "project_nome": {
+            "type": "string",
+            "nullable": true
+          },
+          "project_deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "description": "Registro legado projetos. project_nome/project_deleted_at são enriquecimento dos GET /projetos; outras respostas SELECT */RETURNING * podem omiti-los. Nome do Project é atual, não snapshot."
+      },
+      "Requirement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "integer",
+            "nullable": true
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Domínio de novas escritas: Open, In Progress, Closed, Blocked."
+          },
+          "prioridade": {
+            "type": "string",
+            "description": "Low, Medium, High, Critical."
+          }
+        },
+        "description": "Sem vínculo implementado com Projects ou Test Cases."
+      },
+      "TestSuite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "integer",
+            "nullable": true
+          },
+          "nome": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "projeto_id": {
+            "type": "integer",
+            "description": "FK legada para projetos.id, não projects.id.",
+            "nullable": true
+          },
+          "total_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          }
+        },
+        "description": "total_cases aparece na consulta de suítes de plano; não é calculado por toda listagem de suítes."
+      },
+      "TestPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "escopo": {
+            "type": "string",
+            "nullable": true
+          },
+          "objetivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "ambiente": {
+            "type": "string",
+            "nullable": true
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "legacy_classification": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "review_required",
+              "executed"
+            ]
+          },
+          "execution_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "execution_deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "description": "Campos execution_id/execution_deleted_at são enriquecidos no GET/listagem; não em todo RETURNING *. Não há created_by no INSERT do serviço de planos."
+      },
+      "Execution": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "integer",
+            "nullable": true
+          },
+          "plan_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "suite_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "ambiente": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Valores novos validados por ExecutionStatus; registros históricos não são normalizados aqui."
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true
+          },
+          "finalized": {
+            "type": "boolean"
+          },
+          "nome_suite": {
+            "type": "string",
+            "nullable": true
+          },
+          "projeto_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "nome_projeto": {
+            "type": "string",
+            "nullable": true
+          },
+          "total_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          },
+          "passed_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          },
+          "failed_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          },
+          "blocked_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          },
+          "skipped_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          },
+          "pending_cases": {
+            "$ref": "#/components/schemas/SqlCount"
+          }
+        },
+        "description": "Campos agregados/nome_suite/projeto_id/nome_projeto aparecem na listagem; outras operações retornam a linha persistida. projeto_id é da suíte legada, não o Project opcional do caso."
+      },
+      "ExecutionResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "execucao_id": {
+            "type": "integer"
+          },
+          "projeto_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "comentario": {
+            "type": "string",
+            "nullable": true
+          },
+          "titulo": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "feature": {
+            "type": "string",
+            "nullable": true
+          },
+          "cenarios": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "description": "execution_results não possui deleted_at. GET results adiciona título/descrição/feature/cenarios atuais do caso; PUT retorna somente a linha do resultado."
+      },
+      "SuiteCaseLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "suite_id": {
+            "type": "integer"
+          },
+          "projeto_id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "suite_id",
+          "projeto_id"
+        ],
+        "description": "ON CONFLICT pode retornar apenas suite_id/projeto_id quando vínculo já existe."
+      },
+      "PlanSuiteLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "plan_id": {
+            "type": "integer"
+          },
+          "suite_id": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "plan_id",
+          "suite_id"
+        ],
+        "description": "ON CONFLICT pode retornar apenas plan_id/suite_id."
+      },
+      "ProjectPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "ProjectList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/ProjectPage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "TestCasePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "TestCaseList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TestCasePage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "RequirementPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Requirement"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "RequirementList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Requirement"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/RequirementPage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "TestSuitePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestSuite"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "TestSuiteList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestSuite"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TestSuitePage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "TestPlanPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestPlan"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "TestPlanList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestPlan"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TestPlanPage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "ExecutionPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Execution"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "ExecutionList": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Execution"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/ExecutionPage"
+          }
+        ],
+        "description": "Sem page/limit: array; com qualquer um: envelope. Defaults page=1/limit=20; limite máximo 100."
+      },
+      "CaseTotals": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "passed",
+          "failed",
+          "pending",
+          "blocked",
+          "skipped"
+        ]
+      },
+      "ExecutionStats": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          },
+          "totalExecutions": {
+            "type": "integer"
+          },
+          "finalizedExecutions": {
+            "type": "integer"
+          }
+        },
+        "description": "Contagens normalizadas para números; não filtram uniformemente registros soft-deletados."
+      },
+      "ReportCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "comentario": {
+            "type": "string",
+            "nullable": true
+          },
+          "projeto_id": {
+            "type": "integer"
+          },
+          "titulo": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportExecution": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Execution"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "testCases": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReportCase"
+                }
+              }
+            },
+            "required": [
+              "testCases"
+            ]
+          }
+        ]
+      },
+      "GeneratedReport": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "passed": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "successRate": {
+                "type": "number",
+                "description": "Passed/total de execuções, arredondado a uma casa; zero quando vazio."
+              },
+              "testCases": {
+                "$ref": "#/components/schemas/CaseTotals"
+              }
+            },
+            "required": [
+              "total",
+              "passed",
+              "failed",
+              "pending",
+              "successRate",
+              "testCases"
+            ]
+          },
+          "executions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportExecution"
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "executions"
+        ]
+      },
+      "ReportsHistory": {
+        "type": "object",
+        "properties": {
+          "executions": {
+            "$ref": "#/components/schemas/ExecutionList"
+          },
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "count": {
+                  "$ref": "#/components/schemas/SqlCount"
+                }
+              }
+            }
+          },
+          "suiteStats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "suite_id": {
+                  "type": "integer"
+                },
+                "nome": {
+                  "type": "string"
+                },
+                "total": {
+                  "$ref": "#/components/schemas/SqlCount"
+                },
+                "passed": {
+                  "$ref": "#/components/schemas/SqlCount"
+                },
+                "failed": {
+                  "$ref": "#/components/schemas/SqlCount"
+                },
+                "blocked": {
+                  "$ref": "#/components/schemas/SqlCount"
+                },
+                "skipped": {
+                  "$ref": "#/components/schemas/SqlCount"
+                },
+                "pending": {
+                  "$ref": "#/components/schemas/SqlCount"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "executions",
+          "stats",
+          "suiteStats"
+        ],
+        "description": "Somente executions é paginado; stats/suiteStats são globais. Sem paginação: executions contém até 100 registros. Inclui histórico sem filtro uniforme de deleted_at."
+      },
+      "Dashboard": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "totalProjects": {
+                "type": "integer",
+                "description": "Conta casos legados de projetos, não catálogo projects."
+              },
+              "totalExecutions": {
+                "type": "integer"
+              },
+              "testCases": {
+                "$ref": "#/components/schemas/CaseTotals"
+              }
+            }
+          },
+          "recentProjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TestCase"
+            }
+          },
+          "recentExecutions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Execution"
+            }
+          }
+        },
+        "required": [
+          "stats",
+          "recentProjects",
+          "recentExecutions"
+        ],
+        "description": "Em erro, serviço devolve zeros/arrays vazios e rota mantém HTTP 200; consulta executa DDL preexistente."
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "healthy": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "uptime": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "responseTimeMs": {
+            "type": "number"
+          },
+          "database": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "up",
+                  "down"
+                ]
+              },
+              "error": {
+                "type": "string",
+                "description": "Mensagem interna atual do driver em falha; limitação de segurança conhecida."
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "healthy",
+          "status",
+          "uptime",
+          "timestamp",
+          "responseTimeMs",
+          "database"
+        ]
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "entity_type": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "old_values": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "new_values": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "ip_address": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_email": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "RegisterInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 255,
+            "description": "Trim antes de validar comprimento."
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password"
+        ]
+      },
+      "LoginInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ForgotInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "writeOnly": true
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
+      },
+      "ForgotResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "_dev_token": {
+            "type": "string",
+            "description": "Somente fora de produção, quando e-mail existe; não há envio SMTP implementado."
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ProjectCreate": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim; não vazio."
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "nome"
+        ]
+      },
+      "ProjectUpdate": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim; não vazio."
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "description": "PUT parcial; pelo menos nome ou descricao deve estar presente. Omitido preserva; descricao:null limpa; campos geridos pelo servidor são descartados.",
+        "minProperties": 1,
+        "anyOf": [
+          {
+            "required": [
+              "nome"
+            ]
+          },
+          {
+            "required": [
+              "descricao"
+            ]
+          }
+        ]
+      },
+      "TestCaseCreate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim na criação."
+          },
+          "feature": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim na criação."
+          },
+          "cenarios": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Número estrito, sem coerção; pai ativo. Omissão cria sem vínculo.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "titulo",
+          "descricao",
+          "feature"
+        ]
+      },
+      "TestCaseUpdate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "cenarios": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Omitido preserva; null remove; número estrito vincula pai ativo.",
+            "nullable": true
+          }
+        },
+        "description": "Campos omitidos preservados, incluindo cenarios. JSON null grava JSON null. Sem versionamento geral de edição concorrente."
+      },
+      "RequirementCreate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Open",
+              "In Progress",
+              "Closed",
+              "Blocked"
+            ],
+            "default": "Open"
+          },
+          "prioridade": {
+            "type": "string",
+            "enum": [
+              "Low",
+              "Medium",
+              "High",
+              "Critical"
+            ],
+            "default": "Medium"
+          }
+        },
+        "required": [
+          "titulo"
+        ]
+      },
+      "RequirementUpdate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Open",
+              "In Progress",
+              "Closed",
+              "Blocked"
+            ]
+          },
+          "prioridade": {
+            "type": "string",
+            "enum": [
+              "Low",
+              "Medium",
+              "High",
+              "Critical"
+            ]
+          }
+        },
+        "description": "PUT parcial; serviço usa COALESCE e valores falsy, portanto string vazia não limpa descrição."
+      },
+      "CoercedNullableId": {
+        "description": "null ou entrada coercível por Number() para inteiro positivo; omissão permitida no campo. Usado por projeto_id legado de suíte."
+      },
+      "TestSuiteCreate": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string",
+            "default": ""
+          },
+          "projeto_id": {
+            "$ref": "#/components/schemas/CoercedNullableId"
+          }
+        },
+        "required": [
+          "nome"
+        ]
+      },
+      "TestSuiteUpdate": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "projeto_id": {
+            "$ref": "#/components/schemas/CoercedNullableId"
+          }
+        },
+        "description": "PUT parcial; COALESCE/valores falsy não removem projeto_id por null e não limpam texto vazio."
+      },
+      "TestPlanCreate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string",
+            "default": ""
+          },
+          "escopo": {
+            "type": "string",
+            "default": ""
+          },
+          "objetivo": {
+            "type": "string",
+            "default": ""
+          },
+          "ambiente": {
+            "$ref": "#/components/schemas/Environment"
+          }
+        },
+        "required": [
+          "titulo",
+          "ambiente"
+        ]
+      },
+      "TestPlanUpdate": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trim."
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "escopo": {
+            "type": "string"
+          },
+          "objetivo": {
+            "type": "string"
+          },
+          "ambiente": {
+            "$ref": "#/components/schemas/Environment"
+          }
+        },
+        "description": "PUT parcial somente de plano eligible e não executado; classificação/executed_at não são editáveis pelo cliente."
+      },
+      "ExecutePlanInput": {
+        "type": "object",
+        "properties": {},
+        "description": "Body objeto validado por z.object({}); campos antigos, inclusive ambiente, são descartados. Ambiente vem do plano."
+      },
+      "ExecutionCreate": {
+        "type": "object",
+        "properties": {
+          "suite_id": {
+            "$ref": "#/components/schemas/CoercedPositiveId"
+          },
+          "ambiente": {
+            "type": "string",
+            "enum": [
+              "staging",
+              "production",
+              "development",
+              "homologação"
+            ],
+            "default": "staging"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "running",
+              "passed",
+              "failed",
+              "blocked",
+              "completed",
+              "skipped"
+            ],
+            "default": "pending"
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "suite_id"
+        ]
+      },
+      "ExecutionUpdate": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "resultado": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "description": "PUT parcial; serviço não verifica finalized e usa COALESCE/valores falsy em resultado."
+      },
+      "ResultUpdate": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ExecutionStatus"
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Omitir comentário no serviço pode limpá-lo; sucesso também marca execução running. Não altera apenas um rascunho."
+      },
+      "ReportFilters": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "description": "Valor truthy parametrizado com cast ::date no PostgreSQL; sem schema Zod específico."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Inclusiva: consulta usa < dia seguinte; cast ::date."
+          },
+          "suite_id": {
+            "description": "Valor truthy parametrizado para suite_id; rota não impõe tipo/positividade por Zod."
+          }
+        },
+        "description": "Campos suportados pelo serviço; outros ignorados. Sem validação de intervalo/tipos na rota; dados inválidos podem gerar erro de driver/500, não prometer 422 uniforme."
+      },
+      "RoleInput": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "qa",
+              "reader"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "AddCaseInput": {
+        "type": "object",
+        "properties": {
+          "projeto_id": {
+            "$ref": "#/components/schemas/CoercedPositiveId"
+          }
+        },
+        "required": [
+          "projeto_id"
+        ]
+      },
+      "AddSuiteInput": {
+        "type": "object",
+        "properties": {
+          "suite_id": {
+            "$ref": "#/components/schemas/CoercedPositiveId"
+          }
+        },
+        "required": [
+          "suite_id"
+        ]
+      }
+    },
+    "parameters": {
+      "LegacyId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "ID legado: regex decimal; aceita zero/zeros iniciais, sem limite superior no validator. Não confundir com IDs estritos de /projects.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+$"
+        }
+      },
+      "ProjectId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Inteiro positivo de /projects; texto de rota não aceita zero nem zeros iniciais.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "ProjetoId": {
+        "name": "projetoId",
+        "in": "path",
+        "required": true,
+        "description": "ID legado do caso (projetos.id).",
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+$"
+        }
+      },
+      "SuiteId": {
+        "name": "suiteId",
+        "in": "path",
+        "required": true,
+        "description": "ID da suíte.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\\d+$"
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Opt-in: informar page ou limit ativa envelope; Zod faz coerção.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Opt-in; máximo validado de 100.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        }
+      }
+    },
+    "responses": {
+      "Http400": {
+        "description": "JSON inválido no parser ou campo obrigatório do banco (23502); serviço pode produzir 400 nos caminhos descritos.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http401": {
+        "description": "JWT ausente, inválido, expirado ou revogado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http403": {
+        "description": "Perfil insuficiente ou restrição administrativa descrita na operação.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http404": {
+        "description": "Recurso ausente/excluído ou estado incompatível com restore.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http409": {
+        "description": "Conflito de negócio ou unicidade (23505).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http413": {
+        "description": "Body JSON acima de 500 kb no parser.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http422": {
+        "description": "Validação Zod com detalhes, referência inválida (23503) ou rejeição de negócio descrita.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http429": {
+        "description": "Limite de requisições atingido no escopo configurado; bypass em test.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Http500": {
+        "description": "Falha interna; mensagem mascarada em NODE_ENV=production. Não representa rollback garantido.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
         }
       }
     }
   },
   "paths": {
-    "/auth/register": {
-      "post": {
-        "tags": ["Autenticação"],
-        "summary": "1️⃣ Registrar novo usuário (primeiro!)",
-        "description": "Execute PRIMEIRO para criar uma conta. Requer x-register-token header com valor do REGISTER_TOKEN no .env",
-        "parameters": [
-          {
-            "name": "x-register-token",
-            "in": "header",
-            "required": true,
-            "schema": { "type": "string" },
-            "description": "Token de registro do .env (REGISTER_TOKEN) - Cole aqui"
-          }
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Documentação"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "nome": { "type": "string", "example": "João Silva" },
-                  "email": { "type": "string", "example": "joao@empresa.com" },
-                  "password": { "type": "string", "example": "SenhaForte@123" }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Usuário criado! Agora faça login com este email/password",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "integer" },
-                    "nome": { "type": "string" },
-                    "email": { "type": "string" }
-                  }
-                }
-              }
-            }
-          },
-          "403": { "description": "Token de registro inválido. Verifique REGISTER_TOKEN no .env" }
-        }
-      }
-    },
-    "/auth/login": {
-      "post": {
-        "tags": ["Autenticação"],
-        "summary": "2️⃣ Fazer Login e receber JWT",
-        "description": "Execute DEPOIS de registrar. Retorna JWT token para usar em endpoints protegidos. Cole o token em 'Authorize' no topo.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": { "type": "string", "example": "usuario@empresa.com" },
-                  "password": { "type": "string", "example": "senha123" }
-                }
-              }
-            }
-          }
-        },
+        "operationId": "get_openapi_json",
+        "summary": "Consultar especificação OpenAPI",
+        "description": "GET registrado diretamente em app.js antes de auth/Helmet/CORS/limiters. Não lê o arquivo estático da raiz; este é exportação derivada da mesma especificação.",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Login bem-sucedido! COPIE O TOKEN E CLIQUE EM AUTHORIZE",
+            "description": "Sucesso",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {
-                    "token": {
-                      "type": "string",
-                      "description": "COPIE ESTE VALOR"
-                    },
-                    "user": { "$ref": "#/components/schemas/User" }
-                  }
+                  "properties": {},
+                  "description": "Documento OpenAPI 3.0 gerado de swagger.js e anotações; objeto aberto para evitar autorreferência recursiva."
                 }
               }
             }
-          },
-          "401": {
-            "description": "Email ou senha inválidos"
           }
-        }
+        },
+        "x-roles": [],
+        "x-business-rules": [],
+        "x-source": "backend/src/swagger.js"
       }
     },
     "/projetos": {
       "get": {
-        "tags": ["Projetos"],
-        "summary": "Listar todos os projetos",
-        "security": [{ "bearerAuth": [] }],
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "get_projetos",
+        "summary": "Listar TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Lista de projetos",
+            "description": "Sucesso",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/Projeto" }
+                  "$ref": "#/components/schemas/TestCaseList"
                 }
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
           "401": {
-            "description": "Sem token! Faça login primeiro."
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
           }
-        }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "description": "Ordenação global; default created_at.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "created_at"
+              ]
+            }
+          },
+          {
+            "name": "sort_dir",
+            "in": "query",
+            "required": false,
+            "description": "Direção; default desc; desempate por id.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ]
       },
       "post": {
-        "tags": ["Projetos"],
-        "summary": "Criar novo projeto",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": { "type": "string", "example": "Novo Projeto" },
-                  "description": { "type": "string", "example": "Descrição" },
-                  "status": { "type": "string", "example": "ativo" }
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "post_projetos",
+        "summary": "Criar TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCase"
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
           }
         },
-        "responses": {
-          "201": {
-            "description": "Projeto criado"
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCaseCreate"
+              }
+            }
           }
         }
       }
     },
     "/projetos/{id}": {
       "get": {
-        "tags": ["Projetos"],
-        "summary": "Obter projeto por ID",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "get_projetos_id",
+        "summary": "Consultar TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort.",
+        "security": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" }
+            "bearerAuth": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Projeto encontrado",
+            "description": "Sucesso",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Projeto" }
+                "schema": {
+                  "$ref": "#/components/schemas/TestCase"
+                }
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
           "404": {
-            "description": "Projeto não encontrado"
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
           }
-        }
-      },
-      "put": {
-        "tags": ["Projetos"],
-        "summary": "Atualizar projeto",
-        "security": [{ "bearerAuth": [] }],
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" }
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "put_projetos_id",
+        "summary": "Atualizar TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort. PUT parcial: campos omitidos preservam valores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
           "content": {
             "application/json": {
-              "schema": { "type": "object" }
+              "schema": {
+                "$ref": "#/components/schemas/TestCaseUpdate"
+              }
             }
           }
-        },
-        "responses": {
-          "200": { "description": "Projeto atualizado" }
         }
       },
       "delete": {
-        "tags": ["Projetos"],
-        "summary": "Deletar projeto",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "delete_projetos_id",
+        "summary": "Excluir logicamente TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+        "security": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer" }
+            "bearerAuth": []
           }
         ],
         "responses": {
-          "200": { "description": "Projeto deletado" }
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/projetos/{id}/restore": {
+      "post": {
+        "tags": [
+          "Test Cases (legado)"
+        ],
+        "operationId": "post_projetos_id_restore",
+        "summary": "Restaurar TestCase",
+        "description": "Casos de teste legados, não catálogo Projects. GET enriquece Project atual mesmo excluído; cenarios JSON livre. project_id omitido preserva/null remove/ID ativo vincula. Auditoria best-effort. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-008",
+          "RN-009",
+          "RN-015",
+          "RN-018",
+          "RN-019"
+        ],
+        "x-source": "backend/src/routes/projetos.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/projects": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "get_projects",
+        "summary": "Listar Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "post_projects",
+        "summary": "Criar Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais. ID, autoria, timestamps e deleted_at enviados pelo cliente são descartados.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreate"
+              }
+            }
+          }
         }
+      }
+    },
+    "/projects/{id}": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "get_projects_id",
+        "summary": "Consultar Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "put_projects_id",
+        "summary": "Atualizar Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais. PUT parcial: campos omitidos preservam valores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "delete_projects_id",
+        "summary": "Excluir logicamente Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ]
+      }
+    },
+    "/projects/{id}/restore": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "post_projects_id_restore",
+        "summary": "Restaurar Project",
+        "description": "Catálogo independente. Leituras somente ativas; nome trim; autoria do servidor; descricao:null limpa. Escrita/auditoria transacionais. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/projects.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ]
+      }
+    },
+    "/test-suites": {
+      "get": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "get_test_suites",
+        "summary": "Listar TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSuiteList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "post_test_suites",
+        "summary": "Criar TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSuite"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSuiteCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-suites/{id}": {
+      "get": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "get_test_suites_id",
+        "summary": "Consultar TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSuite"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "put_test_suites_id",
+        "summary": "Atualizar TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy. PUT parcial: campos omitidos preservam valores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSuite"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSuiteUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "delete_test_suites_id",
+        "summary": "Excluir logicamente TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/test-suites/{id}/restore": {
+      "post": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "post_test_suites_id_restore",
+        "summary": "Restaurar TestSuite",
+        "description": "Suíte de casos; projeto_id legado referencia projetos, não projects. PUT usa COALESCE/valores falsy. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSuite"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/test-suites/{id}/cases": {
+      "get": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "get_test_suites_id_cases",
+        "summary": "Consultar casos vinculados",
+        "description": "Consulta vínculo legado por suite_id; não verifica existência/ativo da suíte e não filtra deleted_at dos casos. Sem linhas retorna array vazio, não 404 garantido.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TestCase"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "post_test_suites_id_cases",
+        "summary": "Vincular caso",
+        "description": "projeto_id referencia caso legado. ON CONFLICT não duplica; FK inválida pode gerar 422. Não impõe a mesma verificação de ativo do serviço de planos.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteCaseLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-007"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCaseInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-suites/{id}/cases/{projetoId}": {
+      "delete": {
+        "tags": [
+          "Test Suites"
+        ],
+        "operationId": "delete_test_suites_id_cases_projetoId",
+        "summary": "Remover vínculo de caso",
+        "description": "DELETE físico somente da associação; não exclui caso. Responde mensagem mesmo sem vínculo correspondente; não garante 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testSuites.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          },
+          {
+            "$ref": "#/components/parameters/ProjetoId"
+          }
+        ]
+      }
+    },
+    "/requirements": {
+      "get": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "get_requirements",
+        "summary": "Listar Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequirementList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "post_requirements",
+        "summary": "Criar Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Requirement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requirements/{id}": {
+      "get": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "get_requirements_id",
+        "summary": "Consultar Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Requirement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "put_requirements_id",
+        "summary": "Atualizar Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE. PUT parcial: campos omitidos preservam valores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Requirement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequirementUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "delete_requirements_id",
+        "summary": "Excluir logicamente Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/requirements/{id}/restore": {
+      "post": {
+        "tags": [
+          "Requirements"
+        ],
+        "operationId": "post_requirements_id_restore",
+        "summary": "Restaurar Requirement",
+        "description": "Sem vínculo com Projects/casos. Domínios Open/In Progress/Closed/Blocked e Low/Medium/High/Critical. Update não limpa descrição vazia pelo COALESCE. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Requirement"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-010",
+          "RN-015",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/requirements.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/test-plans": {
+      "get": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "get_test_plans",
+        "summary": "Listar TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestPlanList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "post_test_plans",
+        "summary": "Criar TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestPlanCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-plans/{id}": {
+      "get": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "get_test_plans_id",
+        "summary": "Consultar TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "put_test_plans_id",
+        "summary": "Atualizar TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by. PUT parcial: campos omitidos preservam valores. Estado de plano pode produzir 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestPlanUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "delete_test_plans_id",
+        "summary": "Excluir logicamente TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404. Em planos, delete é permitido também a executados e não os desbloqueia.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/test-plans/{id}/restore": {
+      "post": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "post_test_plans_id_restore",
+        "summary": "Restaurar TestPlan",
+        "description": "Planos eligible podem ser editados; review_required/executed ou executed_at bloqueiam mutações e reexecução. Ambiente canônico obrigatório ao criar. Consulta adiciona vínculo de execução, sem created_by. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011",
+          "RN-012",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/test-plans/{id}/suites": {
+      "get": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "get_test_plans_id_suites",
+        "summary": "Consultar suítes do plano",
+        "description": "Plano ativo obrigatório (404 caso ausente/excluído). Preserva vínculos de suítes excluídas; total_cases conta casos ativos atuais.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TestSuite"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-011",
+          "RN-012"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "post_test_plans_id_suites",
+        "summary": "Vincular suíte",
+        "description": "Plano ativo eligible não executado; suíte ativa necessária (404). Lock de plano e transação; ON CONFLICT devolve vínculo existente; estado bloqueado 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanSuiteLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSuiteInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-plans/{id}/suites/{suiteId}": {
+      "delete": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "delete_test_plans_id_suites_suiteId",
+        "summary": "Remover vínculo de suíte",
+        "description": "Lock/transação e elegibilidade do plano. Remove associação física; inexistência do vínculo não gera 404 por si só. Plano ausente/excluído 404; estado bloqueado 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-011"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          },
+          {
+            "$ref": "#/components/parameters/SuiteId"
+          }
+        ]
+      }
+    },
+    "/test-plans/{id}/execute": {
+      "post": {
+        "tags": [
+          "Test Plans"
+        ],
+        "operationId": "post_test_plans_id_execute",
+        "summary": "Executar plano uma única vez",
+        "description": "Ambiente vem do plano. Exige plano ativo eligible, suíte ativa e caso ativo; deduplica casos. Cria execução/resultados pending e executed_at na mesma transação com lock. Falta de suítes/casos ou reexecução: 409. UNIQUE plan_id persiste após soft delete. suite_id é a primeira suíte ativa; não snapshot completo. Não executa runner de automação.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-011",
+          "RN-012"
+        ],
+        "x-source": "backend/src/routes/testPlans.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutePlanInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "operationId": "get_stats",
+        "summary": "Consultar dashboard",
+        "description": "totalProjects conta projetos legados. Serviço executa ALTER TABLE preexistente e captura erro retornando zeros/listas vazias com HTTP 200. Não comprova indicadores válidos em falha nem somente ativos.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-007"
+        ],
+        "x-source": "backend/src/routes/stats.js"
+      }
+    },
+    "/execucoes": {
+      "get": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "get_execucoes",
+        "summary": "Listar Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "name": "projeto_id",
+            "in": "query",
+            "required": false,
+            "description": "Filtro global em ts.projeto_id legado, antes de paginação; não é Project do catálogo.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "post_execucoes",
+        "summary": "Criar Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execucoes/{id}": {
+      "get": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "get_execucoes_id",
+        "summary": "Consultar Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "put_execucoes_id",
+        "summary": "Atualizar Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. PUT parcial: campos omitidos preservam valores.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionUpdate"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "delete_execucoes_id",
+        "summary": "Excluir logicamente Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/execucoes/{id}/restore": {
+      "post": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "post_execucoes_id_restore",
+        "summary": "Restaurar Execution",
+        "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-014",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/execucoes/stats/summary": {
+      "get": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "get_execucoes_stats_summary",
+        "summary": "Consultar totais de resultados",
+        "description": "Contagens de execution_results e execuções/finalizadas. Não filtra uniformemente soft delete; números normalizados por parseInt.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-014"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js"
+      }
+    },
+    "/execucoes/{id}/results": {
+      "get": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "get_execucoes_id_results",
+        "summary": "Consultar resultados",
+        "description": "JOIN com dados atuais do caso; não exige execução ativa nem produz 404 pela ausência da execução. Array vazio se sem linhas; ORDER BY er.created_at ASC.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionResult"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-014"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/execucoes/{id}/results/{projetoId}": {
+      "put": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "put_execucoes_id_results_projetoId",
+        "summary": "Atualizar resultado e comentário",
+        "description": "Consulta finalized e rejeita com 422; resultado ausente 404. Status obrigatório; comentário omitido/vazio pode virar null. Atualiza resultado e depois execução running sem transação abrangente. Não filtra execução soft-deletada; corrida com finalize não é atomicamente bloqueada.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-014"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          },
+          {
+            "$ref": "#/components/parameters/ProjetoId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/execucoes/{id}/finalize": {
+      "post": {
+        "tags": [
+          "Execuções"
+        ],
+        "operationId": "post_execucoes_id_finalize",
+        "summary": "Finalizar execução",
+        "description": "Ausente 404; já finalizada 422. Algum failed => failed; todos passed com total positivo => passed; demais => completed, inclusive pending/zero resultados. Marca finalized=true. Sem transação/lock abrangente; não filtra deleted_at e PUT geral não é bloqueado por essa guarda. Política caracterizada, não correção dos riscos.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-013",
+          "RN-014"
+        ],
+        "x-source": "backend/src/routes/execucoesDetalhado.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/relatorios": {
+      "get": {
+        "tags": [
+          "Relatórios"
+        ],
+        "operationId": "get_relatorios",
+        "summary": "Consultar histórico e agregados",
+        "description": "Sem paginação: até 100 execuções; opt-in: executions vira envelope. stats e suiteStats permanecem globais. Sem filtro uniforme de excluídos; agregação por suite_id principal limita planos multi-suíte.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportsHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-015",
+          "RN-016",
+          "RN-017"
+        ],
+        "x-source": "backend/src/routes/relatorios.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ]
+      }
+    },
+    "/relatorios/generate": {
+      "post": {
+        "tags": [
+          "Relatórios"
+        ],
+        "operationId": "post_relatorios_generate",
+        "summary": "Gerar relatório JSON",
+        "description": "Filtros truthy parametrizados; endDate inclusiva por limite do próximo dia. Sem Zod de filtros. Consulta casos por execução (N+1) e retorna conjunto completo; joins usam dados atuais, sem snapshot ou filtro uniforme de soft delete.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-017"
+        ],
+        "x-source": "backend/src/routes/relatorios.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportFilters"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/relatorios/export": {
+      "post": {
+        "tags": [
+          "Relatórios"
+        ],
+        "operationId": "post_relatorios_export",
+        "summary": "Exportar DOCX",
+        "description": "Mesma geração/filtros e limitações do JSON; cria buffer DOCX integral. Não gera um recurso persistido de relatório.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Arquivo DOCX",
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"qa-report-AAAA-MM-DD.docx\"; data UTC ISO do servidor.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa"
+        ],
+        "x-business-rules": [
+          "RN-017"
+        ],
+        "x-source": "backend/src/routes/relatorios.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportFilters"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "operationId": "post_auth_register",
+        "summary": "Cadastrar usuário",
+        "description": "Exige x-register-token, não Bearer. Primeiro usuário recebe admin; seguintes qa; papel enviado no body é descartado. Bootstrap por contagem não serializa concorrência. E-mail normalizado; bcrypt; duplicidade 409.",
+        "security": [
+          {
+            "registerToken": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [],
+        "x-business-rules": [
+          "RN-001"
+        ],
+        "x-source": "backend/src/routes/auth.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "operationId": "post_auth_login",
+        "summary": "Autenticar",
+        "description": "Validator exige email válido e password não vazio; campos inválidos 422. Serviço lowercase/trim do e-mail e bcrypt.compare mesmo sem usuário; usuário inexistente/senha incorreta 401 genérico. Não aceita role do cliente; JTI único.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [],
+        "x-business-rules": [
+          "RN-002",
+          "RN-003"
+        ],
+        "x-source": "backend/src/routes/auth.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "operationId": "post_auth_logout",
+        "summary": "Revogar token atual",
+        "description": "Auth inline inclusive em test. Registra JTI/expiração, limpa revogações expiradas. Tokens legados sem JTI não são revogados. Botão frontend é somente local; não chama este endpoint.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin",
+          "qa",
+          "reader"
+        ],
+        "x-business-rules": [
+          "RN-004"
+        ],
+        "x-source": "backend/src/routes/auth.js"
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "operationId": "post_auth_forgot_password",
+        "summary": "Solicitar redefinição",
+        "description": "Mensagem genérica; token bruto só fora de produção e com usuário existente. Hash SHA-256 e validade no banco; invalida tokens anteriores não usados. Envio de e-mail NÃO implementado.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [],
+        "x-business-rules": [
+          "RN-005"
+        ],
+        "x-source": "backend/src/routes/auth.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Autenticação"
+        ],
+        "operationId": "post_auth_reset_password",
+        "summary": "Redefinir senha",
+        "description": "Token omitido/vazio e senha inválida: 422; token fornecido não encontrado/usado/expirado: 400. Atualiza hash da senha e uso do token sem transação abrangente; não revoga todos os JWTs anteriores.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [],
+        "x-business-rules": [
+          "RN-005"
+        ],
+        "x-source": "backend/src/routes/auth.js",
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios": {
+      "get": {
+        "tags": [
+          "Administração"
+        ],
+        "operationId": "get_admin_usuarios",
+        "summary": "Listar usuários públicos",
+        "description": "Admin-only; ordenado por id; sem hash de senha, sem paginação.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicUser"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006"
+        ],
+        "x-source": "backend/src/routes/admin.js"
+      }
+    },
+    "/admin/usuarios/{id}/role": {
+      "patch": {
+        "tags": [
+          "Administração"
+        ],
+        "operationId": "patch_admin_usuarios_id_role",
+        "summary": "Alterar papel de usuário",
+        "description": "Não altera o próprio papel (403); alvo ausente 404; role fora do enum 422 na rota. Não revoga automaticamente JWTs emitidos anteriormente.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-003",
+          "RN-006"
+        ],
+        "x-source": "backend/src/routes/admin.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/usuarios/{id}": {
+      "delete": {
+        "tags": [
+          "Administração"
+        ],
+        "operationId": "delete_admin_usuarios_id",
+        "summary": "Excluir usuário",
+        "description": "Exclusão física sujeita às FKs; própria conta 403, ausente 404. Não é soft delete.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-006",
+          "RN-015"
+        ],
+        "x-source": "backend/src/routes/admin.js",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LegacyId"
+          }
+        ]
+      }
+    },
+    "/admin/audit-log": {
+      "get": {
+        "tags": [
+          "Administração"
+        ],
+        "operationId": "get_admin_audit_log",
+        "summary": "Consultar auditoria",
+        "description": "Eventos existentes com snapshots e contexto. Não cobre toda mutação; auditoria legada best-effort, catálogo transacional. Paginação própria sem validação comum; entrada inválida pode gerar erro de driver.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "x-roles": [
+          "admin"
+        ],
+        "x-business-rules": [
+          "RN-016",
+          "RN-018"
+        ],
+        "x-source": "backend/src/routes/admin.js",
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "description": "Filtro literal, incluindo project (catálogo) e projeto (caso legado); não possui enum Zod.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "description": "parseInt no serviço; sem schema Zod de ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "description": "parseInt no serviço.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "Serviço converte para maiúsculas; CREATE/UPDATE/DELETE/RESTORE nos eventos instrumentados; sem enum na rota.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Limite inicial inclusivo, enviado ao PostgreSQL; sem validação de formato na rota.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Limite final inclusivo; sem expansão automática para fim do dia.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Default 1; parseInt; não possui a validação comum de paginação.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Default 20; parseInt; sem limite máximo comum de 100.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Saúde"
+        ],
+        "operationId": "get_health",
+        "summary": "Consultar saúde",
+        "description": "Público antes de auth/Helmet/CORS/limiters. SELECT 1; 200 saudável ou 503 degradado com mensagem do driver. Não comprova SLA.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Degradado: banco inacessível, mensagem interna em database.error no comportamento atual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        },
+        "x-roles": [],
+        "x-business-rules": [],
+        "x-source": "backend/src/routes/health.js"
       }
     }
   }

@@ -140,3 +140,209 @@ function padCol(str, width) {
 }
 
 module.exports = router;
+/**
+ * @openapi
+ * {
+ *   "/relatorios": {
+ *     "get": {
+ *       "tags": [
+ *         "Relatórios"
+ *       ],
+ *       "operationId": "get_relatorios",
+ *       "summary": "Consultar histórico e agregados",
+ *       "description": "Sem paginação: até 100 execuções; opt-in: executions vira envelope. stats e suiteStats permanecem globais. Sem filtro uniforme de excluídos; agregação por suite_id principal limita planos multi-suíte.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/ReportsHistory"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-015",
+ *         "RN-016",
+ *         "RN-017"
+ *       ],
+ *       "x-source": "backend/src/routes/relatorios.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/Page"
+ *         },
+ *         {
+ *           "$ref": "#/components/parameters/Limit"
+ *         }
+ *       ]
+ *     }
+ *   },
+ *   "/relatorios/generate": {
+ *     "post": {
+ *       "tags": [
+ *         "Relatórios"
+ *       ],
+ *       "operationId": "post_relatorios_generate",
+ *       "summary": "Gerar relatório JSON",
+ *       "description": "Filtros truthy parametrizados; endDate inclusiva por limite do próximo dia. Sem Zod de filtros. Consulta casos por execução (N+1) e retorna conjunto completo; joins usam dados atuais, sem snapshot ou filtro uniforme de soft delete.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/GeneratedReport"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-017"
+ *       ],
+ *       "x-source": "backend/src/routes/relatorios.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ReportFilters"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/relatorios/export": {
+ *     "post": {
+ *       "tags": [
+ *         "Relatórios"
+ *       ],
+ *       "operationId": "post_relatorios_export",
+ *       "summary": "Exportar DOCX",
+ *       "description": "Mesma geração/filtros e limitações do JSON; cria buffer DOCX integral. Não gera um recurso persistido de relatório.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Arquivo DOCX",
+ *           "headers": {
+ *             "Content-Disposition": {
+ *               "description": "attachment; filename=\"qa-report-AAAA-MM-DD.docx\"; data UTC ISO do servidor.",
+ *               "schema": {
+ *                 "type": "string"
+ *               }
+ *             }
+ *           },
+ *           "content": {
+ *             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+ *               "schema": {
+ *                 "type": "string",
+ *                 "format": "binary"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-017"
+ *       ],
+ *       "x-source": "backend/src/routes/relatorios.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ReportFilters"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ */
