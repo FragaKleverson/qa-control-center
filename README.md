@@ -1,282 +1,201 @@
 # QA Control Center
 
-## Estado da feature — 04/11/2026
+Plataforma para organizar requisitos, casos, suítes e planos de teste, registrar
+execuções e resultados e gerar relatórios JSON/DOCX. As execuções representam
+registro e acompanhamento de testes; a aplicação não executa automaticamente
+scripts de automação.
 
-Projects possui catálogo independente em /projects; Test Cases mantém /projetos
-com Project opcional. Test Plans têm execução única e imutabilidade após execução.
-Admin exclui/restaura; QA cria/edita/consulta; Reader consulta.
+## Estado do projeto
 
-Validações confirmadas: **651 isolados/27 suítes**, **339 integrados anteriores**,
-ensaio histórico sintético aprovado (**10 migrations, 60 registros preservados**),
-fluxo manual **9/9**, RBAC manual **6/6** e visual homologado pelo usuário. Prisma
-validate, build Vite e ESLint aprovados anteriormente. Não equivalem a deploy em
-banco original nem a testes de grande volume. Este resumo não reexecutou validações.
+Revisão documental estática de 17/11/2026, baseada no código e no working tree da
+branch `docs/requisitos-api-documentacao`, HEAD-base
+`f6e2465a95516789760c70b6eeb39e01297aa33c`. Nenhum teste, build ou serviço foi
+executado nesta revisão. O projeto foi usado localmente e em experimento de servidor
+de testes; **não está declarado pronto ou homologado para produção**.
 
-Usar **Node 22.13+ na linha 22**; homologado com **22.17.1**. Os Dockerfiles usam
-node:22-alpine. Os manifests aceitam outras linhas, que não foram homologadas aqui.
-[Resultados, ambientes protegidos, contratos e limitações](backend/FEATURE-VALIDATION-STATUS.md).
+O [roadmap.md](roadmap.md) é a única fonte oficial de planejamento e progresso.
+O item 17 está **concluído com ressalvas**, por aceite do responsável; a Fase 5
+continua aberta. Cobertura backend, cenário integrado posterior de relatórios e
+E2E continuam pendentes. Carga/performance backend permanece adiada a pedido.
 
-As instruções genéricas de instalação abaixo destinam-se somente a uma instalação
-nova autorizada. Neste workspace não iniciar/recriar serviços existentes nem usar
-5433/5434/5435 para migrations ou limpeza. Banco descartável com evidências também
-deve ser preservado. Nenhum arquivo de ambiente, senha ou snapshot deve ser commitado.
-
-
-Plataforma completa de gerenciamento e execução de testes para times de QA.
-
-Inspirada em ferramentas como TestRail, Xray e QMetry — mas sem a burocracia e sem o preço.
-
-> **Stack:** React 19 + Vite · Node.js + Express 5 · PostgreSQL 15 · Docker Compose · JWT
-
----
-
-## Funcionalidades
-
-### Autenticação
-- Login com e-mail e senha (JWT, expiração configurável — padrão 8h)
-- Cadastro de novos usuários protegido por `REGISTER_TOKEN` (apenas quem tem o token pode criar conta)
-- Senhas armazenadas com bcrypt
-- Redirecionamento automático para `/login` quando o token expira
-- Informações do usuário logado e botão de logout na sidebar
-
-### Dashboard
-- Métricas gerais: total de execuções, taxa de sucesso, test cases, projetos
-- Últimas execuções e projetos recentes
-
-### Test Cases
-- Criação com ID padronizado automático (`TC0001`, `TC0002`…)
-- Campos: título, descrição, feature, tipo (funcional, regressão, smoke…)
-- Suporte a cenários **Gherkin** (Given / When / Then) com syntax highlight
-- Edição e exclusão inline
-
-### Test Suites
-- Agrupamento de test cases em suites reutilizáveis
-- Listagem com contagem de casos por suite
-
-### Test Plans
-- Criação de planos com nome, escopo, objetivo e ambiente
-- Vinculação de uma ou mais test suites ao plano
-- Execução direta a partir do plano (botão **Execute**)
-
-### Executions
-- Geração de execução a partir de um test plan
-- Rastreabilidade individual por test case dentro da execução
-- Status por test case: `pending` · `running` · `passed` · `failed` · `blocked` · `skipped`
-- Atualização de status inline com seletor por linha
-- Exclusão de execuções com confirmação
-- Filtro e busca por ambiente / status
-
-### Requirements
-- Cadastro de requisitos com prioridade e descrição
-- Vinculação a projetos
-
-### Reports
-- Visão geral com cards de métricas (total, passed, failed, pending)
-- Barra de taxa de sucesso global
-- Breakdown por **Test Suite** com barra de progresso individual
-- **Gerar Relatório Filtrado**: filtros por data início, data fim e suite → exibe resumo + tabela de execuções filtradas
-- Histórico recente de execuções
-- Exportação de documentação em `.docx`
-
----
-
-## Stack
-
-| Camada | Tecnologia |
+| Termo | Interpretação nesta documentação |
 |---|---|
-| Frontend | React 19 + Vite + React Router v6 |
-| Backend | Node.js + Express 5 |
-| Banco | PostgreSQL 15 |
-| Autenticação | JWT (`jsonwebtoken`) + bcrypt |
-| Segurança | Helmet · CORS configurável · Rate Limiting · HPP |
-| Infra | Docker + Docker Compose |
-| Testes | Jest + Supertest e testes isolados; integração somente por runner protegido |
-| Docs | docx |
+| Implementado | Comportamento localizado no código; não significa homologação |
+| Testado historicamente | Resultado anterior com escopo/ambiente delimitados |
+| Pendente de validação | Garantia ainda não demonstrada para o cenário atual |
+| Planejado | Trabalho futuro no roadmap; não funcionalidade entregue |
 
----
+## Stack e arquitetura
 
-## Estrutura do Projeto
-
-```
-qa-control-center/
-├── backend/
-│   ├── src/
-│   │   ├── routes/          # auth, executions, projetos, testSuites, testPlans, requirements, relatorios, stats
-│   │   ├── services/        # lógica de negócio e queries
-│   │   ├── db.js            # pool PostgreSQL
-│   │   └── server.js
-│   ├── tests/               # testes de integração (Jest + Supertest)
-│   ├── .env                 # variáveis locais (não comitar)
-│   ├── .env.example         # template
-│   ├── .env.test            # configuração legada protegida; não usar para ensaio
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── pages/           # Dashboard, Login, TestCases, TestSuites, TestPlan, Executions, Requirements, Reports
-│   │   ├── components/      # Modal, Sidebar, GherkinDisplay, Header
-│   │   ├── contexts/        # AuthContext (estado global de autenticação)
-│   │   ├── routes/          # AppRoutes, ProtectedRoute
-│   │   └── services/api.js  # cliente HTTP centralizado com Bearer token automático
-│   └── Dockerfile
-├── db/
-│   └── init.sql/            # migrations iniciais (00-projetos-executions, 01-test-suites-requirements-plans)
-├── .env                     # variáveis do docker-compose (não comitar)
-├── .env.example             # template completo com descrição de cada variável
-├── docker-compose.yml
-└── QA_Control_Center_API.postman_collection.json
-```
-
----
-
-## Configuração
-
-### 1. Clone o repositório
-
-```bash
-git clone https://github.com/FragaKleverson/qa-control-center.git
-cd qa-control-center
-```
-
-### 2. Configure as variáveis de ambiente
-
-```bash
-cp .env.example .env
-```
-
-Edite o `.env` com suas credenciais. As principais variáveis:
-
-```env
-# PostgreSQL
-POSTGRES_USER=qauser
-POSTGRES_PASSWORD=senha_forte_aqui
-POSTGRES_DB=qa_control
-
-# Conexão backend → banco
-DB_HOST=db
-DB_PORT=5432
-DB_USER=qauser
-DB_PASSWORD=senha_forte_aqui
-DB_DATABASE=qa_control
-
-# JWT — gere com: node -e "require('crypto').randomBytes(32).toString('hex')"
-JWT_SECRET=GERE_UM_VALOR_AQUI
-JWT_EXPIRES_IN=8h
-
-# Token para criação de conta — compartilhe só com quem precisa
-REGISTER_TOKEN=GERE_UM_VALOR_AQUI
-
-# Portas (defaults: 3001/5173)
-BACKEND_PORT=3001
-FRONTEND_PORT=5173
-
-# Em desenvolvimento, exponha o banco para ferramentas locais (DBeaver, psql...)
-DB_PORT_EXPOSED=5433
-
-# CORS — em produção, coloque a URL real do frontend
-ALLOWED_ORIGINS=http://localhost:5173
-```
-
-### 3. Suba os containers
-
-```bash
-docker compose up -d --build
-```
-
-### 4. Acesse
-
-| Serviço | URL |
+| Camada | Implementação confirmada nos manifests/artefatos |
 |---|---|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:3001 |
+| Interface | React 19, React Router DOM 7, Vite 8; SPA |
+| API | Node.js, Express 5, JavaScript CommonJS, Zod |
+| Persistência | PostgreSQL 15 nas imagens Compose; pool `pg` e SQL nos serviços |
+| Evolução do schema | Prisma Migrate 7.8; API não consulta via Prisma Client |
+| Autenticação | `jsonwebtoken`, `bcryptjs`, JWT com JTI e RBAC |
+| Relatórios e contratos | `docx`, `swagger-jsdoc`, `swagger-ui-express`, OpenAPI |
+| Qualidade | Jest 30, Supertest, ESLint; frontend com VM/hooks/mocks |
+| Infraestrutura disponível | Dockerfiles Node 22 Alpine, Compose e Nginx 1.27 Alpine |
 
-### 5. Crie o primeiro usuário
+As versões exatas são registradas nos lockfiles; imagens com tags não comprovam
+versão efetivamente implantada. Linha operacional documentada: Node 22.13+ na
+linha 22, com histórico em 22.17.1. Validações recentes específicas também usaram
+Node Linux 26.13.0; isso não estabelece suporte irrestrito a outras versões.
 
-Use a rota `POST /auth/register` com o `REGISTER_TOKEN` definido no `.env`.  
-A collection do Postman (`QA_Control_Center_API.postman_collection.json`) já tem a requisição **Register** configurada.
+Fluxo: navegador → React/cliente fetch → Express/JWT/RBAC/validators → serviços
+com SQL → PostgreSQL. Prisma versiona o schema separadamente. Consulte a
+[arquitetura](docs/arquitetura.md) e o [guia de desenvolvimento](docs/desenvolvimento.md).
 
-```bash
-curl -X POST http://localhost:3001/auth/register \
-  -H "Content-Type: application/json" \
-  -H "x-register-token: SEU_REGISTER_TOKEN" \
-  -d '{"nome":"Seu Nome","email":"voce@email.com","password":"senha123"}'
+## Funcionalidades implementadas e limites
+
+- **Autenticação:** cadastro controlado por `x-register-token`, login e emissão de
+  JWT com expiração configurável (padrão 8h). Cadastro recebe `name`, `email` e
+  `password`; primeiro usuário recebe Admin, demais QA. Bootstrap concorrente não
+  está serializado. Forgot/reset existem na API, sem entrega de e-mail implementada.
+- **Sessão:** token/usuário em localStorage. Rotas visuais usam presença do token;
+  chamadas protegidas com 401 limpam sessão e redirecionam ao login. Não há timer
+  de expiração no cliente; 403 não encerra sessão. Logout da interface é local;
+  revogação por JTI é operação separada no backend.
+- **Usuários e permissões:** administração via API; Admin/QA criam/editam,
+  Admin exclui/restaura/remove vínculos, Reader consulta. Administração exige
+  Admin; gerar/exportar relatórios exige Admin/QA. Não há isolamento geral por
+  dono, projeto ou tenant. Restrições de estado também se aplicam ao Admin.
+- **Projects:** catálogo independente em `/projects`, com nome/descrição,
+  auditoria transacional, exclusão lógica e restauração na API.
+- **Test Cases:** `/projetos` mantém o recurso legado de casos, com título,
+  descrição, feature e cenários JSON. `project_id` é vínculo opcional ao catálogo;
+  omissão no PUT preserva, `null` remove. A interface oferece edição Gherkin do
+  primeiro cenário, preservando adicionais; não implica execução automática.
+- **Requirements:** título, descrição, status e prioridade. **Sem vínculo
+  implementado com Projects ou Test Cases.**
+- **Test Suites e Plans:** associação de casos/suítes; planos novos elegíveis
+  podem ser executados uma vez, com transação/lock e ambiente persistido. Planos
+  executados ou legados `review_required` bloqueiam mutações/reexecução conforme
+  o contrato. Exclusão/restauração não libera execução; não há endpoint de liberação.
+- **Execuções:** execução de plano materializa resultados; criação direta insere
+  só o registro. Resultados aceitam status/comentário; finalização agrega o estado.
+  Bloqueios e atomicidade têm limites documentados no [contrato HTTP](API.md).
+- **Relatórios/Dashboard:** filtros, agregados, histórico e DOCX. Paginação opt-in
+  nas listagens elegíveis; seletores/relatórios ainda podem carregar coleções
+  completas. Dashboard mantém referências legadas, DDL em consulta e zeros em erro.
+- **Operação:** health check 200/503, auditoria nos pontos instrumentados e
+  exclusão lógica dos recursos principais; usuários/associações têm DELETE físico.
+
+Descrições completas: [26 RFs](docs/requisitos/funcionais.md),
+[15 RNFs](docs/requisitos/nao-funcionais.md), [19 RNs](docs/regras-de-negocio.md)
+e [rastreabilidade](docs/rastreabilidade.md). Os critérios propostos nesses
+catálogos não equivalem a requisitos homologados.
+
+## Estrutura do repositório
+
+```text
+backend/
+  src/                 # app/server, config, middleware, validators, routes, services
+  prisma/              # schema e histórico de migrations
+  scripts/             # runners com guardas; não são autorização de execução
+  tests/               # HTTP/integração, segurança e unitários
+  jest*.js             # separar isolados do setup legado de banco
+frontend/
+  src/                 # pages, components, contexts, routes, hooks, services
+  tests/               # testes isolados com mocks; sem E2E real
+  vite.config.js
+  eslint.config.js
+db/init.sql/           # inicialização SQL legada, não histórico completo atual
+docs/                  # requisitos, arquitetura, regras, rastreabilidade e guias
+openapi.json           # exportação derivada de Swagger/anotações
+QA_Control_Center.postman_collection.json
+docker-compose*.yml    # configurações disponíveis, não prova de implantação
 ```
 
-Após registrar, faça login pela interface web ou via **Login** na collection do Postman — o token JWT é salvo automaticamente na variável `{{token}}`.
+## Instalação e execução local
 
----
+Siga o [guia de instalação](docs/instalacao.md). No Windows, usar **Ubuntu no WSL**
+e confirmar o caminho real do checkout. Docker Desktop não está instalado nesta
+máquina; não presumir integração ou Engine disponível. Instalação de dependências,
+serviços e preparação de schema exigem autorização e destino aprovado.
 
-## Fluxo de Uso
+Não executar `docker compose up` indiscriminadamente: o Compose local inclui
+`db-test`, nomes/volumes fixos e SQL legado. Não usar os bancos preservados nas
+portas **5433, 5434, 5435 ou 5436** para migrations, reset ou testes destrutivos.
+Uma instalação nova precisa de banco exclusivo e histórico de schema aprovado;
+SQL de inicialização do Compose não substitui as migrations atuais.
 
-```
-Test Cases  →  Test Suites  →  Test Plans  →  Execute  →  Executions
-                                                              ↓
-                                              Marcar cada TC: Passed / Failed / ...
-```
+Após instalação autorizada, configuração e schema confirmados, os scripts são
+`npm run dev` em `backend/` e, em outro terminal, em `frontend/`. Backend inicia
+`node src/server.js`, sem watcher. Frontend usa Vite. URLs locais padrão: interface
+`http://localhost:5173`, API `http://localhost:3001`; não presumir que estejam ativas.
 
-1. Crie **Test Cases** com título, descrição, feature e passos Gherkin
-2. Agrupe em **Test Suites**
-3. Monte um **Test Plan** com suites, escopo e ambiente
-4. Clique em **Execute** para gerar uma execução
-5. Em **Executions**, expanda e atualize o status de cada test case individualmente
-6. Em **Reports**, filtre por período ou suite e exporte
+### Configuração
 
----
+- Backend: `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`,
+  `JWT_SECRET`, `REGISTER_TOKEN`; `PORT`, `JWT_EXPIRES_IN`, `ALLOWED_ORIGINS` e
+  limites/custo opcionais. Detalhes e defaults: [instalação](docs/instalacao.md).
+- Prisma: `DATABASE_URL`, coerente com `DB_*`; configuração padrão importa dotenv.
+- Frontend: `VITE_API_BASE_URL`, pública e incorporada no build; nunca colocar
+  segredos em variáveis `VITE_*`. Sem configuração, usa `http://localhost:3001`.
+- Arquivo raiz do Compose não substitui automaticamente `backend/.env`. Templates
+  e valores historicamente versionados são públicos e **não devem ser reutilizados
+  como credenciais**, mesmo em implantação de teste exposta. Não copiar valores
+  reais para documentação ou exemplos.
 
-## Testes automatizados
+## Contratos HTTP e Postman
 
-O fluxo anterior usava qa_control_test:5434 e npm test. Foi substituído para este
-fechamento porque esse banco contém dados a preservar. Não executar o setup Jest
-legado, nem levantar/recriar db-test como forma de preparar testes.
+- Swagger UI: `<origem-da-api>/api-docs/`; JSON gerado: `/openapi.json`.
+- Fonte: [swagger.js](backend/src/swagger.js) e anotações dos
+  [routers](backend/src/routes/); [openapi.json](openapi.json) é exportação derivada.
+- **62 operações explícitas**, incluindo health e JSON da especificação;
+  [API.md](API.md) detalha contratos, permissões e limites.
+- Importar [QA_Control_Center.postman_collection.json](QA_Control_Center.postman_collection.json):
+  62 requisições, 45 variáveis e 123 exemplos sintéticos. **Revisada offline,
+  sem homologação de execução no Postman real.**
+- Coleção bloqueada por padrão; requer destino descartável externamente verificado,
+  IDs capturados com contexto e autorização individual por operação. Há 41
+  operações controladas, incluindo `GET /stats` pelo DDL; 29 de alto impacto exigem
+  confirmação adicional. Flags são consumidas antes do envio. Não usar Runner
+  como autorização implícita. Variável de sessão: `jwt_token`, inicialmente vazia.
+- Guardas não provam identidade do banco nem resistem a edição deliberada. Mocks
+  não comprovam transporte real; limpar valores capturados antes de compartilhar.
 
-- [Comando isolado e runtime validado](backend/FEATURE-VALIDATION-STATUS.md).
-- [Runner de integração e restrições atuais](backend/DISPOSABLE-INTEGRATION.md).
-- [Ensaio independente com dados históricos sintéticos](backend/HISTORICAL-MIGRATION-REHEARSAL.md).
-- [Checklist e resultados](backend/FEATURE-HOMOLOGATION-CHECKLIST.md).
+## Qualidade e evidências
 
-As execuções integradas anteriores usaram 5435, agora preservado com dados de
-homologação. O ensaio histórico usou 5436 e também permanece preservado. Não copiar
-os comandos antigos contra 5434 ou executar testes destrutivos sem nova autorização.
+Resultados abaixo são **históricos**, não reexecuções desta revisão:
 
----
+| Camada | Evidência registrada | Limite |
+|---|---|---|
+| Backend unitário | 22 suítes / 537 testes PASS; cobertura 59,11% statements, 52,63% branches, 58,36% functions, 58,47% lines | Três pisos pendentes frente a 70/50/65/70; não cobre integração |
+| Regressão frontend | 15 suítes / 220 testes PASS, WSL Node 26.13.0 e Jest 30.4.2 | 14 suítes frontend + contrato de API; mocks, não E2E |
+| ESLint frontend | 0 erros / 0 avisos em 53 arquivos | Sem nova execução aqui |
+| Build Vite isolado | Código 0, 63 módulos, cinco artefatos | Build sem .env em /tmp não é release pronta para produção |
+| Segurança/performance frontend | Auditorias estáticas aceitas no item 17 | Sem segurança integrada ou medição em navegador |
+| Integração/manual anteriores | 339 integrados; fluxo 9/9 e RBAC 6/6; ensaio sintético com 10 migrations e 60 registros preservados | Escopos anteriores, não somar com contagens atuais nem presumir schema dos bancos protegidos |
 
-## Desenvolvimento local (sem Docker)
+O registro anterior de 651 isolados/27 suítes permanece no
+[estado de 04/11](backend/FEATURE-VALIDATION-STATUS.md); não é a mesma seleção das
+medições posteriores. Prisma validate foi aprovado historicamente nesse registro.
+Caminhos de evidências e estratégia: [testes](docs/testes.md). Artefatos de `/tmp`
+são efêmeros; existência/preservação não foram verificadas nesta entrega.
 
-### Backend
+## Limitações e próximos passos
 
-```bash
-cd backend
-npm install
-# .env já configurado apontando para localhost
-npm run dev
-```
+BUG-001 a BUG-004, SEC-01 a SEC-04 e PERF-01/PERF-02 permanecem no roadmap, sem
+correção por esta documentação. Incluem respostas antigas em TestSuites,
+callbacks após finalização, resposta inválida em Requirements e limpeza de URL
+Blob em exceção. Há riscos de sessão, dados volumosos e configuração de implantação.
 
-### Frontend
+E2E Playwright está **planejado por último em repositório separado**, provisoriamente
+`qa-control-center-e2e`; não instalado ou implementado neste repositório. Segurança
+integrada, performance dinâmica, acessibilidade, CI/CD, recuperação e implantação
+exigem critérios/validações próprios; metas não aprovadas seguem A DEFINIR.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Documentação e segurança
 
----
+- [Índice técnico e funcional](docs/README.md): documentos anteriores, com notas
+  históricas sobre entregas então pendentes; para o estado atual de API/Postman,
+  usar as fontes e a seção contratual deste README.
+- [Instalação](docs/instalacao.md) · [Desenvolvimento](docs/desenvolvimento.md) ·
+  [Testes](docs/testes.md) · [Preparação para produção](docs/preparacao-producao.md).
+- [Política de segurança](SECURITY.md) e [roadmap oficial](roadmap.md).
 
-## Postman
-
-Importe `QA_Control_Center_API.postman_collection.json`. A collection já tem:
-
-- Variáveis `baseUrl` (`http://localhost:3001`) e `token`
-- **Register**: usa `x-register-token` header — sem auth obrigatória
-- **Login**: test script que salva o token automaticamente em `{{token}}`
-- Todas as demais rotas herdam o Bearer token da collection
-
----
-
-## Segurança
-
-- Senhas com `bcrypt` (12 rounds)
-- JWT com expiração (padrão 8h) — redirecionamento automático ao expirar
-- `REGISTER_TOKEN` controla quem pode criar contas
-- `helmet` + `hpp` nos headers HTTP
-- CORS restrito às origens em `ALLOWED_ORIGINS`
-- Rate limiting configurável (`RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`)
-- Porta do banco não exposta em produção (remova `DB_PORT_EXPOSED` do `.env`)
+Os guias descrevem procedimentos e pré-condições; não autorizam executar comandos
+contra ambientes existentes nem declaram conformidade ou segurança de produção.
