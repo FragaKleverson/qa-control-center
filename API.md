@@ -8,7 +8,7 @@ Contrato revisado estaticamente no commit-base `16ebda87de71e8ea8f57cfb158089b02
 - [openapi.json](openapi.json): exportação derivada, não fonte independente. `GET /openapi.json` retorna o objeto gerado, não lê o arquivo estático.
 - `/api-docs/`: Swagger UI por middleware, HTML e assets; `/api-docs` pode redirecionar à barra final.
 - [Requisitos](docs/requisitos/funcionais.md), [regras RN](docs/regras-de-negocio.md), [rastreabilidade](docs/rastreabilidade.md), [Projects/Test Cases](backend/PROJECTS-PERSISTENCE-CONTRACT.md), [planos](backend/TEST-PLAN-LIFECYCLE.md) e [RBAC](backend/RBAC-PERMISSIONS.md) complementam o contrato.
-- [Postman](QA_Control_Center.postman_collection.json) ainda contém divergências; atualização pendente em entrega separada. Não afirmar cobertura completa.
+- Swagger/OpenAPI documenta 62 operações HTTP; `openapi.json` está sincronizado com a fonte Swagger. A [coleção Postman](QA_Control_Center.postman_collection.json) contém 62 requisições correspondentes, revisadas estaticamente/offline, sem homologação em execução HTTP real. Esses contratos documentais não representam homologação funcional ou prontidão para produção.
 
 ## Autenticação e permissões
 

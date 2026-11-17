@@ -16,7 +16,12 @@ Duplicidade de e-mail retorna 409. Não há transação que serialize o bootstra
 primeiro Admin; não prometer unicidade de primeiro administrador sob concorrência.
 Relaciona [RF-001](requisitos/funcionais.md#rf-001).
 Fonte: [rota](../backend/src/routes/auth.js), [validator](../backend/src/validators/auth.js),
-[serviço](../backend/src/services/authService.js). Contrato HTTP documental ainda requer sincronização.
+[serviço](../backend/src/services/authService.js). A nota histórica de sincronização
+pendente foi superada: [Swagger/OpenAPI](../openapi.json) documenta 62 operações HTTP,
+com exportação sincronizada com a fonte Swagger, e [Postman](../QA_Control_Center.postman_collection.json)
+contém 62 requisições correspondentes. Revisão estática/offline; a coleção não foi
+homologada em execução HTTP real. Contratos documentais não representam homologação
+funcional ou prontidão para produção.
 
 <a id="rn-002"></a>
 ## RN-002 — Credenciais e normalização no login

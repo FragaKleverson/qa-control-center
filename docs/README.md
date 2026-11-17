@@ -45,19 +45,24 @@ Esta entrega não executou testes, builds, serviços ou migrations.
 | [Integração descartável](../backend/DISPOSABLE-INTEGRATION.md) | Procedimentos e guardas; não é autorização de execução |
 | [Homologação no navegador](../backend/BROWSER-HOMOLOGATION.md) | Roteiro e limites de validação manual |
 | [Testes frontend](../frontend/tests/README.md) | Executor isolado e limitações de mocks |
-| [API.md](../API.md) | Guia existente, com divergências a revisar |
-| [Swagger](../backend/src/swagger.js), [OpenAPI estático](../openapi.json) | Fontes existentes, ainda não sincronizadas nesta entrega |
-| [Postman](../QA_Control_Center.postman_collection.json) | Coleção existente; atualização contratual pendente |
+| [API.md](../API.md) | Contratos HTTP revisados estaticamente e limitações implementadas |
+| [Swagger](../backend/src/swagger.js), [OpenAPI estático](../openapi.json) | 62 operações HTTP; openapi.json sincronizado com a fonte Swagger, com validação estática/offline |
+| [Postman](../QA_Control_Center.postman_collection.json) | 62 requisições correspondentes ao OpenAPI; revisão estática/offline, sem homologação em execução HTTP real |
 
 Não copiar contratos completos para múltiplos documentos. Esta camada identifica
-requisitos e aponta para a fonte especializada; Swagger/OpenAPI e Postman serão
-tratados em entregas próprias. Não incluir credenciais nem evidências sensíveis.
+requisitos e aponta para a fonte especializada. Historicamente, a primeira entrega
+deste índice precedeu a sincronização de Swagger/OpenAPI e a atualização de Postman;
+as entregas posteriores concluíram essa revisão documental estática/offline.
+Os contratos documentais não representam homologação funcional ou prontidão para
+produção. Não incluir credenciais nem evidências sensíveis.
 
 ## Decisões pendentes
 
 Revisão dos critérios propostos; política de sessão/revogação; critérios de
 segurança integrada, navegadores/acessibilidade e metas de carga/recursos;
-destinação durável de evidências hoje em `/tmp`; atualização dos contratos HTTP.
+destinação durável de evidências hoje em `/tmp`; validação integrada dos contratos
+HTTP. A sincronização documental de Swagger/OpenAPI e Postman já foi realizada;
+a execução HTTP real da coleção Postman ainda não foi homologada.
 E2E Playwright permanece futuro, em repositório separado, conforme roadmap.
 
 ## Revisão documental antes do commit
