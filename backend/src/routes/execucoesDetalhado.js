@@ -121,3 +121,679 @@ router.post("/:id/restore", authorize("admin"), validate(idParamSchema, "params"
 });
 
 module.exports = router;
+/**
+ * @openapi
+ * {
+ *   "/execucoes": {
+ *     "get": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "get_execucoes",
+ *       "summary": "Listar Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Paginação opt-in; sem page/limit retorna array. Ordenação default por created_at DESC; Projects/Plans/Executions e casos têm desempate por id, Suites/Requirements não.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/ExecutionList"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/Page"
+ *         },
+ *         {
+ *           "$ref": "#/components/parameters/Limit"
+ *         },
+ *         {
+ *           "name": "projeto_id",
+ *           "in": "query",
+ *           "required": false,
+ *           "description": "Filtro global em ts.projeto_id legado, antes de paginação; não é Project do catálogo.",
+ *           "schema": {
+ *             "type": "integer",
+ *             "minimum": 1,
+ *             "maximum": 2147483647
+ *           }
+ *         }
+ *       ]
+ *     },
+ *     "post": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "post_execucoes",
+ *       "summary": "Criar Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "201": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Execution"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "409": {
+ *           "$ref": "#/components/responses/Http409"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ExecutionCreate"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/execucoes/{id}": {
+ *     "get": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "get_execucoes_id",
+ *       "summary": "Consultar Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Execution"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ]
+ *     },
+ *     "put": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "put_execucoes_id",
+ *       "summary": "Atualizar Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. PUT parcial: campos omitidos preservam valores.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Execution"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "409": {
+ *           "$ref": "#/components/responses/Http409"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ],
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ExecutionUpdate"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     },
+ *     "delete": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "delete_execucoes_id",
+ *       "summary": "Excluir logicamente Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Preenche deleted_at sem excluir fisicamente. Repetição/ausente retorna 404.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Message"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ]
+ *     }
+ *   },
+ *   "/execucoes/{id}/restore": {
+ *     "post": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "post_execucoes_id_restore",
+ *       "summary": "Restaurar Execution",
+ *       "description": "Registro de execução. Criação direta não materializa execution_results; PUT geral NÃO verifica finalized. Não confundir com execução transacional do plano. Limpa deleted_at; ativo/ausente retorna 404; preserva identidade/vínculos e bloqueios do plano. Sem UI administrativa de restauração.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Execution"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-006",
+ *         "RN-014",
+ *         "RN-015"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ]
+ *     }
+ *   },
+ *   "/execucoes/stats/summary": {
+ *     "get": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "get_execucoes_stats_summary",
+ *       "summary": "Consultar totais de resultados",
+ *       "description": "Contagens de execution_results e execuções/finalizadas. Não filtra uniformemente soft delete; números normalizados por parseInt.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/ExecutionStats"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-014"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js"
+ *     }
+ *   },
+ *   "/execucoes/{id}/results": {
+ *     "get": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "get_execucoes_id_results",
+ *       "summary": "Consultar resultados",
+ *       "description": "JOIN com dados atuais do caso; não exige execução ativa nem produz 404 pela ausência da execução. Array vazio se sem linhas; ORDER BY er.created_at ASC.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "type": "array",
+ *                 "items": {
+ *                   "$ref": "#/components/schemas/ExecutionResult"
+ *                 }
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa",
+ *         "reader"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-014"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ]
+ *     }
+ *   },
+ *   "/execucoes/{id}/results/{projetoId}": {
+ *     "put": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "put_execucoes_id_results_projetoId",
+ *       "summary": "Atualizar resultado e comentário",
+ *       "description": "Consulta finalized e rejeita com 422; resultado ausente 404. Status obrigatório; comentário omitido/vazio pode virar null. Atualiza resultado e depois execução running sem transação abrangente. Não filtra execução soft-deletada; corrida com finalize não é atomicamente bloqueada.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/ExecutionResult"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-014"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         },
+ *         {
+ *           "$ref": "#/components/parameters/ProjetoId"
+ *         }
+ *       ],
+ *       "requestBody": {
+ *         "required": true,
+ *         "description": "Objeto JSON; campos desconhecidos são descartados quando há validator Zod.",
+ *         "content": {
+ *           "application/json": {
+ *             "schema": {
+ *               "$ref": "#/components/schemas/ResultUpdate"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "/execucoes/{id}/finalize": {
+ *     "post": {
+ *       "tags": [
+ *         "Execuções"
+ *       ],
+ *       "operationId": "post_execucoes_id_finalize",
+ *       "summary": "Finalizar execução",
+ *       "description": "Ausente 404; já finalizada 422. Algum failed => failed; todos passed com total positivo => passed; demais => completed, inclusive pending/zero resultados. Marca finalized=true. Sem transação/lock abrangente; não filtra deleted_at e PUT geral não é bloqueado por essa guarda. Política caracterizada, não correção dos riscos.",
+ *       "security": [
+ *         {
+ *           "bearerAuth": []
+ *         }
+ *       ],
+ *       "responses": {
+ *         "200": {
+ *           "description": "Sucesso",
+ *           "content": {
+ *             "application/json": {
+ *               "schema": {
+ *                 "$ref": "#/components/schemas/Execution"
+ *               }
+ *             }
+ *           }
+ *         },
+ *         "400": {
+ *           "$ref": "#/components/responses/Http400"
+ *         },
+ *         "401": {
+ *           "$ref": "#/components/responses/Http401"
+ *         },
+ *         "403": {
+ *           "$ref": "#/components/responses/Http403"
+ *         },
+ *         "404": {
+ *           "$ref": "#/components/responses/Http404"
+ *         },
+ *         "413": {
+ *           "$ref": "#/components/responses/Http413"
+ *         },
+ *         "422": {
+ *           "$ref": "#/components/responses/Http422"
+ *         },
+ *         "429": {
+ *           "$ref": "#/components/responses/Http429"
+ *         },
+ *         "500": {
+ *           "$ref": "#/components/responses/Http500"
+ *         }
+ *       },
+ *       "x-roles": [
+ *         "admin",
+ *         "qa"
+ *       ],
+ *       "x-business-rules": [
+ *         "RN-013",
+ *         "RN-014"
+ *       ],
+ *       "x-source": "backend/src/routes/execucoesDetalhado.js",
+ *       "parameters": [
+ *         {
+ *           "$ref": "#/components/parameters/LegacyId"
+ *         }
+ *       ]
+ *     }
+ *   }
+ * }
+ */
