@@ -40,3 +40,4 @@ coverage/
 *.lcov
 .claude/
 .github/
+AGENTS.md
