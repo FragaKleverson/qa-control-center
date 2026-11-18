@@ -72,10 +72,11 @@ Inventário revisado: 62 operações explícitas. Não inclui HEAD implícito, p
 ou assets HTML do Swagger como endpoints de negócio adicionais. Validação de
 OpenAPI não executa validators Zod, SQL ou RBAC.
 
-A [coleção Postman](../QA_Control_Center.postman_collection.json) está revisada
-offline com 62 operações; sua execução real permanece não homologada. URLs, tokens,
-IDs e autorizações dependem de variáveis; nenhum Runner deve encadear escritas sem
-consentimento individual. GET /stats também é controlado por executar DDL.
+A [coleção Postman](../QA_Control_Center.postman_collection.json) cobre as 62
+operações e teve validação manual confirmada pelo usuário. A URL da API, os
+tokens, os IDs e os filtros são configurados por ambiente. Escritas afetam o
+backend selecionado e `GET /stats` pode executar DDL. Veja as instruções de
+importação e segurança no [README](../README.md#postman-e-api).
 
 Os runners em [backend/scripts](../backend/scripts/) são especializados. Ações
 check/homologação podem abrir banco e portas mesmo sem executar testes. Não chamar

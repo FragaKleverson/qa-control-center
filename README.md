@@ -84,7 +84,8 @@ qa-control-center/
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
 ├── openapi.json
-└── QA_Control_Center.postman_collection.json
+├── QA_Control_Center.postman_collection.json
+└── postman/environments/   # Ambientes importáveis do Postman
 ```
 
 ## Configuração e inicialização local
@@ -135,14 +136,27 @@ Não usar `npm test` backend indiscriminadamente: o setup legado aponta para o b
 
 ## Postman e API
 
-- Swagger UI em `/api-docs/`; especificação gerada em `/openapi.json`.
-- **62 operações HTTP** documentadas; [openapi.json](openapi.json) sincronizado com Swagger.
-- Importe [QA_Control_Center.postman_collection.json](QA_Control_Center.postman_collection.json): **62 requisições** correspondentes.
-- Variáveis principais: `baseUrl`, `jwt_token`, `register_token` e IDs de recursos capturados.
-- A coleção começa bloqueada e exige destino descartável verificado e autorização individual para operações controladas, incluindo `GET /stats`.
-- Revisada estaticamente/offline; ainda não homologada em execução HTTP real.
+A [coleção QA_Control_Center.postman_collection.json](QA_Control_Center.postman_collection.json) reúne 62 requisições organizadas por módulos, correspondentes às operações do [OpenAPI](openapi.json). O Swagger UI está disponível em `/api-docs/`.
 
-Detalhes de endpoints, autenticação e respostas: [API.md](API.md).
+### Importação e configuração
+
+No Postman, use **Import** para importar a coleção e os três arquivos de ambiente.
+
+| Ambiente | Arquivo | `baseUrl` inicial |
+|---|---|---|
+| DEV | [QA_Control_Center_DEV.postman_environment.json](postman/environments/QA_Control_Center_DEV.postman_environment.json) | `http://localhost:3001` |
+| TESTE | [QA_Control_Center_TESTE.postman_environment.json](postman/environments/QA_Control_Center_TESTE.postman_environment.json) | Vazio |
+| PROD | [QA_Control_Center_PROD.postman_environment.json](postman/environments/QA_Control_Center_PROD.postman_environment.json) | Vazio |
+
+1. Selecione o ambiente no Postman. Para TESTE e PROD, preencha `baseUrl` com a URL confirmada da API, sem barra final. A conexão com o PostgreSQL é configurada no backend.
+2. Preencha localmente `synthetic_email` e `synthetic_password` e execute `POST /auth/login`. A coleção captura `jwt_token` no ambiente ativo e o usa como Bearer nas rotas autenticadas. O cadastro usa `register_token`. O logout bem-sucedido limpa o token e os dados da sessão nesse mesmo ambiente.
+3. Use os IDs capturados das respostas de criação ou informe os IDs dos recursos existentes no ambiente selecionado. Ative os parâmetros opcionais de paginação e filtros na aba **Params** quando necessário. Os valores capturados e os ajustes de variáveis ficam separados por ambiente.
+
+### Cuidados ao executar requisições
+
+A coleção é uma ferramenta de desenvolvimento e testes e fica fora do deploy da aplicação. Escritas e exclusões modificam os dados no backend selecionado. A rota `GET /stats` pode executar DDL. Selecionar PROD não autoriza testes destrutivos. Mantenha tokens, senhas e credenciais reais nos valores locais do Postman e fora do Git.
+
+Consulte o contrato de endpoints, autenticação e respostas em [API.md](API.md).
 
 ## Segurança
 

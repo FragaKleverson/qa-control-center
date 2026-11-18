@@ -47,7 +47,7 @@ Esta entrega não executou testes, builds, serviços ou migrations.
 | [Testes frontend](../frontend/tests/README.md) | Executor isolado e limitações de mocks |
 | [API.md](../API.md) | Contratos HTTP revisados estaticamente e limitações implementadas |
 | [Swagger](../backend/src/swagger.js), [OpenAPI estático](../openapi.json) | 62 operações HTTP; openapi.json sincronizado com a fonte Swagger, com validação estática/offline |
-| [Postman](../QA_Control_Center.postman_collection.json) | 62 requisições correspondentes ao OpenAPI; revisão estática/offline, sem homologação em execução HTTP real |
+| [Postman](../QA_Control_Center.postman_collection.json) | 62 requisições correspondentes ao OpenAPI, com validação manual confirmada pelo usuário. Importação e ambientes no [README](../README.md#postman-e-api) |
 
 Não copiar contratos completos para múltiplos documentos. Esta camada identifica
 requisitos e aponta para a fonte especializada. Historicamente, a primeira entrega
@@ -61,8 +61,8 @@ produção. Não incluir credenciais nem evidências sensíveis.
 Revisão dos critérios propostos; política de sessão/revogação; critérios de
 segurança integrada, navegadores/acessibilidade e metas de carga/recursos;
 destinação durável de evidências hoje em `/tmp`; validação integrada dos contratos
-HTTP. A sincronização documental de Swagger/OpenAPI e Postman já foi realizada;
-a execução HTTP real da coleção Postman ainda não foi homologada.
+HTTP. Swagger/OpenAPI e Postman estão sincronizados. A validação manual da coleção
+foi confirmada pelo usuário.
 E2E Playwright permanece futuro, em repositório separado, conforme roadmap.
 
 ## Revisão documental antes do commit

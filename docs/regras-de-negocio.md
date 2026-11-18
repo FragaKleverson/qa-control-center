@@ -19,9 +19,9 @@ Fonte: [rota](../backend/src/routes/auth.js), [validator](../backend/src/validat
 [serviço](../backend/src/services/authService.js). A nota histórica de sincronização
 pendente foi superada: [Swagger/OpenAPI](../openapi.json) documenta 62 operações HTTP,
 com exportação sincronizada com a fonte Swagger, e [Postman](../QA_Control_Center.postman_collection.json)
-contém 62 requisições correspondentes. Revisão estática/offline; a coleção não foi
-homologada em execução HTTP real. Contratos documentais não representam homologação
-funcional ou prontidão para produção.
+contém 62 requisições correspondentes e teve validação manual confirmada pelo
+usuário. A homologação funcional e a prontidão para produção dependem de
+validações próprias.
 
 <a id="rn-002"></a>
 ## RN-002 — Credenciais e normalização no login
